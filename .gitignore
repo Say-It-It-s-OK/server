@@ -71,6 +71,7 @@ web_modules/
 
 # dotenv environment variables file
 .env
+.env.local
 .env.test
 .env.production
 
@@ -88,12 +89,6 @@ dist
 
 # Gatsby files
 .cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
-
-# vuepress build output
-.vuepress/dist
 
 # Serverless directories
 .serverless/
@@ -117,7 +112,11 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-#보안관련해서..
-package-lock.
+# Git merge conflict files
+*.orig
 
+# Security & lock file
+package-lock.json
+
+# macOS 관련 파일
 .DS_Store
