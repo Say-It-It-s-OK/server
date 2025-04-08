@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const menuSchema = new mongoose.menuSchema({
+const menuSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   type: {
