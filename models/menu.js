@@ -19,7 +19,7 @@ const optionSchema = new mongoose.Schema(
       enum: ["S", "M", "L"],
     },
   },
-  { _id: flase }
+  { _id: false }
 );
 
 const menuSchema = new mongoose.Schema({
