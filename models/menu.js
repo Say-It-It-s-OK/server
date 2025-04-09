@@ -32,13 +32,10 @@ const menuSchema = new mongoose.Schema({
   },
   price: { type: Number, required: true },
   options: {
-    type: Object,
-    default: {},
-  },
-  options: {
     type: optionSchema,
     required: true,
   },
+
   ingredient: {
     type: [String],
     default: [],

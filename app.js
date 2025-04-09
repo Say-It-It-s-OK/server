@@ -20,3 +20,7 @@ app.listen(port, function () {
 app.get("/", function (req, res) {
   res.send("말하면 OK 서버 실행 중");
 });
+
+// sample data 삽입 테스트 후 삭제 예정 -> 일단 지금은 주석처리
+// const devRoutes = require("./routes/.dev");
+// app.use("/dev", devRoutes);
