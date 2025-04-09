@@ -34,18 +34,22 @@ const Menu = require("../models/menu");
  *                         type: array
  *                         items:
  *                           type: string
+ *                           enum: [핫, 아이스]
  *                       샷:
  *                         type: array
  *                         items:
  *                           type: string
+ *                           enum: [연하게, 보통, 진하게]
  *                       샷 추가:
  *                         type: array
  *                         items:
  *                           type: string
+ *                           enum: [1샷 추가, 2샷 추가, 3샷 추가]
  *                       크기:
  *                         type: array
  *                         items:
  *                           type: string
+ *                           enum: [S, M, L]
  *                   ingredient:
  *                     type: array
  *                     items:
