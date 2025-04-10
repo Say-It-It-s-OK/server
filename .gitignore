@@ -124,3 +124,5 @@ package-lock.json
 
 # 테스트 후 삭제할 예정 일단 DB 연결이 아직 되지 않았으므로 숨김처리만 함.
 routes/.dev.js
+.test
+.test/.test.js
