@@ -1,5 +1,4 @@
 const express = require("express");
-const router = express.Router();
 const queryController = require("../controllers/queryController");
 
 /**
@@ -51,6 +50,8 @@ const queryController = require("../controllers/queryController");
  *                       action:
  *                         type: string
  */
+
+const router = express.Router();
 
 router.post("/", queryController.handleQuery);
 

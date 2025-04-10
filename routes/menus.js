@@ -1,6 +1,8 @@
 const express = require("express");
-const router = express.Router();
 const Menu = require("../models/menu");
+
+const router = express.Router();
+
 let cachedData = null; // 캐시 데이터
 
 /**

@@ -36,7 +36,6 @@ const menuSchema = new mongoose.Schema(
       type: optionSchema,
       required: true,
     },
-
     ingredient: {
       type: [String],
       default: [],
