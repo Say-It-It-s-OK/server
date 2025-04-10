@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Menu = require("../models/menu");
+let cachedData = null; // 캐시 데이터
 
 /**
  * @swagger
@@ -34,22 +35,18 @@ const Menu = require("../models/menu");
  *                         type: array
  *                         items:
  *                           type: string
- *                           enum: [핫, 아이스]
  *                       샷:
  *                         type: array
  *                         items:
  *                           type: string
- *                           enum: [연하게, 보통, 진하게]
  *                       샷 추가:
  *                         type: array
  *                         items:
  *                           type: string
- *                           enum: [1샷 추가, 2샷 추가, 3샷 추가]
  *                       크기:
  *                         type: array
  *                         items:
  *                           type: string
- *                           enum: [S, M, L]
  *                   ingredient:
  *                     type: array
  *                     items:
@@ -58,8 +55,20 @@ const Menu = require("../models/menu");
 
 router.get("/", async (req, res) => {
   try {
+    if (!cachedData) {
+      const menus = await Menu.find();
+      cachedData = menus;
+      return res.json(menus);
+    }
+
     const menus = await Menu.find();
-    res.json(menus);
+
+    if (JSON.stringify(menus) !== JSON.stringify(cachedData)) {
+      cachedData = menus;
+      return res.json(menus);
+    }
+
+    return res.json(cachedData);
   } catch (err) {
     res.status(500).json({ error: "메뉴 불러오기 실패" });
   }

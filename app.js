@@ -1,6 +1,7 @@
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger/swagger");
+const menusRouter = require("./routes/menus");
 
 require("./db");
 
@@ -26,3 +27,5 @@ app.get("/", function (req, res) {
 // sample data 삽입 테스트 후 삭제 예정 -> 일단 지금은 주석처리
 // const devRoutes = require("./routes/.dev");
 // app.use("/dev", devRoutes);
+
+module.exports = app;

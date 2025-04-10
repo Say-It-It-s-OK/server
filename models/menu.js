@@ -22,24 +22,27 @@ const optionSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const menuSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  type: {
-    type: String,
-    enum: ["커피", "디카페인", "음료", "티", "디저트"],
-    required: true,
-  },
-  price: { type: Number, required: true },
-  options: {
-    type: optionSchema,
-    required: true,
-  },
+const menuSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    type: {
+      type: String,
+      enum: ["커피", "디카페인", "음료", "티", "디저트"],
+      required: true,
+    },
+    price: { type: Number, required: true },
+    options: {
+      type: optionSchema,
+      required: true,
+    },
 
-  ingredient: {
-    type: [String],
-    default: [],
+    ingredient: {
+      type: [String],
+      default: [],
+    },
   },
-});
+  { timestamps: true }
+);
 
 module.exports = mongoose.model("Menu", menuSchema, "Menu");

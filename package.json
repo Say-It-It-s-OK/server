@@ -18,6 +18,10 @@
         "swagger-ui-express": "^5.0.1"
     },
     "devDependencies": {
+        "chai": "^5.2.0",
+        "mocha": "^11.1.0",
+        "supertest": "^7.1.0",
         "vite": "^6.2.5"
-    }
+    },
+    "type": "module"
 }
