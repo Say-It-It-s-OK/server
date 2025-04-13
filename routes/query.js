@@ -1,6 +1,7 @@
 const express = require("express");
 const queryController = require("../controllers/queryController");
 const Menu = require("../models/menu");
+const router = express.Router();
 
 /**
  * @swagger
@@ -15,7 +16,7 @@ const Menu = require("../models/menu");
  *         required: true
  *         schema:
  *           type: string
- *           enum: [커피, 음료, 디카페인, 디저트]
+ *           enum: [coffee, drink, decafein, dessert]
  *     responses:
  *       200:
  *         description: 메뉴 목록 반환
@@ -137,7 +138,6 @@ router.get("/confirm/details", async (req, res) => {
   });
 });
 
-const router = express.Router();
 
 router.post("/", queryController.handleQuery);
 
