@@ -57,15 +57,9 @@ let cachedData = null;
 
 router.get("/", async (req, res) => {
   try {
-    if (!cachedData) {
-      const menus = await Menu.find();
-      cachedData = menus;
-      return res.json(menus);
-    }
-
     const menus = await Menu.find();
 
-    if (JSON.stringify(menus) !== JSON.stringify(cachedData)) {
+    if (!cachedData || JSON.stringify(menus) !== JSON.stringify(cachedData)) {
       cachedData = menus;
       return res.json(menus);
     }
