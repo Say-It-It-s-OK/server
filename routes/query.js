@@ -1,6 +1,7 @@
 const express = require("express");
 const queryController = require("../controllers/queryController");
 const Menu = require("../models/menu");
+
 const router = express.Router();
 
 /**
@@ -30,7 +31,7 @@ const router = express.Router();
  *                   example: query.confirm
  *                 speech:
  *                   type: string
- *                   example: 고객님 요청에 따라 [메뉴명] 메뉴를 보여드립니다
+ *                   example: 고객님 요청에 따라 커피 메뉴를 보여드립니다
  *                 page:
  *                   type: string
  *                   enum: [coffee, drink, decafein, dessert]
@@ -47,9 +48,9 @@ const router = express.Router();
  *                       price:
  *                         type: number
  */
-
 router.get("/confirm/menu/:type", async (req, res) => {
   const { type } = req.params;
+
   const typeMap = {
     coffee: "커피",
     drink: "음료",
@@ -58,6 +59,9 @@ router.get("/confirm/menu/:type", async (req, res) => {
   };
 
   const menuType = typeMap[type];
+  if (!menuType) {
+    return res.status(400).json({ error: "잘못된 type 값입니다" });
+  }
 
   try {
     const menus = await Menu.find({ type: menuType });
@@ -96,7 +100,6 @@ router.get("/confirm/menu/:type", async (req, res) => {
  *                   type: string
  *                   example: cart
  */
-
 router.get("/confirm/cart", async (req, res) => {
   return res.json({
     response: "query.confirm",
@@ -129,16 +132,24 @@ router.get("/confirm/cart", async (req, res) => {
  *                   type: string
  *                   example: details
  */
-
 router.get("/confirm/details", async (req, res) => {
   return res.json({
-    response: "query.cofirm",
+    response: "query.confirm", // ← 오타 'cofirm'이었음, 수정
     speech: "고객님 요청에 따라 결제 내용을 보여드립니다",
     page: "details",
   });
 });
 
-
+/**
+ * @swagger
+ * /query:
+ *   post:
+ *     summary: 쿼리 요청 처리
+ *     description: 사용자의 자연어 쿼리를 분석하여 적절한 응답을 반환합니다.
+ *     responses:
+ *       200:
+ *         description: 쿼리 처리 결과 반환
+ */
 router.post("/", queryController.handleQuery);
 
 module.exports = router;

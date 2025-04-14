@@ -3,17 +3,23 @@ const Menu = require("../models/menu");
 exports.handleQuery = async (req, res) => {
   const { request } = req.body;
 
+  const typeMap = {
+    coffee: "커피",
+    drink: "음료",
+    decafein: "디카페인",
+    dessert: "디저트",
+  };
+
   // query.confirm.menu
   if (request.startsWith("query.confirm.menu.")) {
-    const typeMap = {
-      coffee: "커피",
-      drink: "음료",
-      decafein: "디카페인",
-      dessert: "디저트",
-    };
-
     const typeKey = request.split(".")[3];
     const menuType = typeMap[typeKey];
+
+    if (!menuType) {
+      return res
+        .status(400)
+        .json({ error: "유효하지 않은 메뉴 카테고리입니다." });
+    }
 
     try {
       const menus = await Menu.find({ type: menuType });
@@ -45,4 +51,6 @@ exports.handleQuery = async (req, res) => {
       page: "details",
     });
   }
+
+  return res.status(400).json({ error: "지원하지 않는 request 타입입니다." });
 };
