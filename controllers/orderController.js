@@ -57,18 +57,29 @@ exports.handleOrder = async (req, res) => {
 
   // query.order.pay
   if (request === "query.order.pay") {
-    if (!Array.isArray(order) || order.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "유효한 주문 데이터가 필요합니다." });
     }
 
     const orderTime = new Date();
     const orderId = `ORD${orderTime.getTime()}`;
 
-    const orderDocs = order.map((item) => ({
+    // items 배열을 menu_id 기준으로 그룹핑 (수량 계산)
+    const itemMap = new Map();
+    items.forEach((item) => {
+      const menuId = item.id;
+      if (itemMap.has(menuId)) {
+        itemMap.set(menuId, itemMap.get(menuId) + 1);
+      } else {
+        itemMap.set(menuId, 1);
+      }
+    });
+
+    const orderDocs = Array.from(itemMap).map(([menu_id, quantity]) => ({
       order_id: orderId,
       order_date: orderTime,
-      menu_id: item.menu_id,
-      quantity: item.quantity
+      menu_id,
+      quantity
     }));
 
     try {
