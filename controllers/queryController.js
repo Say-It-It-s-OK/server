@@ -7,7 +7,7 @@ exports.handleQuery = async (req, res) => {
   const typeMap = {
     coffee: "커피",
     drink: "음료",
-    decafein: "디카페인",
+    decaffein: "디카페인",
     dessert: "디저트",
   };
 

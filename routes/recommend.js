@@ -1,5 +1,6 @@
 // routes/recommend.js
 const express = require("express");
+const recommendController = require("../controllers/recommendController");
 const router = express.Router();
 const Order = require("../models/orders");
 
@@ -208,6 +209,17 @@ router.get("/cost/low", async (req, res) => {
     }
   });
 
+/**
+ * @swagger
+ * /recommend:
+ *   post:
+ *     summary: 추천 요청 처리
+ *     description: 사용자의 자연어 쿼리를 분석하여 적절한 응답을 반환합니다.
+ *     responses:
+ *       200:
+ *         description: 추천 처리 결과 반환
+ */
+router.post("/", recommendController.handleRecommend);
 
 
 module.exports = router;

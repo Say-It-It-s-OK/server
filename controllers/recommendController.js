@@ -1,13 +1,13 @@
 const Menu = require("../models/menu");
 const Order = require('../models/orders');
 
-exports.handleQuery = async (req, res) => {
+exports.handleRecommend = async (req, res) => {
     const { request } = req.body;
 
     const typeMap = {
       coffee: "커피",
       drink: "음료",
-      decafein: "디카페인",
+      decaffein: "디카페인",
       dessert: "디저트",
     };
 
