@@ -47,6 +47,15 @@ const orderController = require("../controllers/orderController");
  *               cart:
  *                 type: array
  *                 items: { type: string }
+ *               order:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     menu_id:
+ *                       type: string
+ *                     quantity:
+ *                       type: number
  *     responses:
  *       200:
  *         description: 주문 요청에 대한 처리 결과
@@ -69,6 +78,8 @@ const orderController = require("../controllers/orderController");
  *                 items:
  *                   type: array
  *                   items: { type: string }
+ *                 order_id:
+ *                   type: string
  */
 
 router.post("/", orderController.handleOrder);

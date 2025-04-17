@@ -4,6 +4,7 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger/swagger");
 const menusRouter = require("./routes/menus");
 const queryRoutes = require('./routes/query');
+const orderRoutes = require("./routes/order");
 const recommendRoutes = require('./routes/recommend');
 
 require("./db");
@@ -23,6 +24,7 @@ app.use(
 app.use("/menus", menusRouter);
 app.use('/query', queryRoutes);
 app.use('/recommend', recommendRoutes);
+app.use("/order", orderRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 if (process.env.NODE_ENV !== "test") {
