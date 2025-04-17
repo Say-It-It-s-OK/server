@@ -1,4 +1,5 @@
 const Menu = require("../models/menu");
+const Order = require('../models/orders');
 
 exports.handleQuery = async (req, res) => {
   const { request } = req.body;
@@ -10,6 +11,7 @@ exports.handleQuery = async (req, res) => {
     dessert: "디저트",
   };
 
+  
   // query.confirm.menu
   if (request.startsWith("query.confirm.menu.")) {
     const typeKey = request.split(".")[3];
@@ -50,7 +52,7 @@ exports.handleQuery = async (req, res) => {
       speech: "고객님 요청에 따라 결제 내용을 보여드립니다",
       page: "details",
     });
-  }
+  } 
 
   return res.status(400).json({ error: "지원하지 않는 request 타입입니다." });
 };

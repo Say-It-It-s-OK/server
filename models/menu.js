@@ -12,7 +12,7 @@ const optionSchema = new mongoose.Schema(
     },
     "샷 추가": {
       type: [String],
-      enum: ["1샷 추가", "2샷 추가", "3샷 추가"],
+      enum: ["1샷 추가", "2샷 추가"],
     },
     크기: {
       type: [String],
@@ -28,7 +28,7 @@ const menuSchema = new mongoose.Schema(
     name: { type: String, required: true },
     type: {
       type: String,
-      enum: ["커피", "디카페인", "음료", "티", "디저트"],
+      enum: ["커피", "디카페인", "음료", "디저트"],
       required: true,
     },
     price: { type: Number, required: true },
@@ -40,6 +40,12 @@ const menuSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    decaffein : {
+      type: String
+    },
+    tag : {
+      type: [String]
+    }
   },
   { timestamps: true }
 );
