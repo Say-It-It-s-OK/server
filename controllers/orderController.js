@@ -6,7 +6,7 @@ exports.handleOrder = async (req, res) => {
 
   const typeMap = {
     coffee: "커피",
-    decaffein: "디카페인",
+    decaffeine: "디카페인",
     drink: "음료",
     dessert: "디저트",
   };
