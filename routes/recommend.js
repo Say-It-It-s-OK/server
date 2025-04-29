@@ -13,10 +13,10 @@ const Order = require("../models/orders");
  *       - in: path
  *         name: type
  *         required: true
- *         description: 추천할 메뉴 타입 (coffee, drink, decaffein, dessert)
+ *         description: 추천할 메뉴 타입 (coffee, drink, decaffeine, dessert)
  *         schema:
  *           type: string
- *           enum: [coffee, drink, decaffein, dessert]
+ *           enum: [coffee, drink, decaffeine, dessert]
  *     responses:
  *       200:
  *         description: 추천된 메뉴 리스트
@@ -50,7 +50,7 @@ const Order = require("../models/orders");
 const typeMap = {
   coffee: "커피",
   drink: "음료",
-  decaffein: "디카페인",
+  decaffeine: "디카페인",
   dessert: "디저트",
 };
 
@@ -116,7 +116,7 @@ router.get("/:type", async (req, res) => {
  *         name: type
  *         schema:
  *           type: string
- *           enum: [coffee, drink, decaffein, dessert]
+ *           enum: [coffee, drink, decaffeine, dessert]
  *         required: false
  *         description: 메뉴 타입 (선택 사항)
  *     responses:

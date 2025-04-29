@@ -17,7 +17,7 @@ const router = express.Router();
  *         required: true
  *         schema:
  *           type: string
- *           enum: [coffee, drink, decaffein, dessert]
+ *           enum: [coffee, drink, decaffeine, dessert]
  *     responses:
  *       200:
  *         description: 메뉴 목록 반환
@@ -34,7 +34,7 @@ const router = express.Router();
  *                   example: 고객님 요청에 따라 커피 메뉴를 보여드립니다
  *                 page:
  *                   type: string
- *                   enum: [coffee, drink, decafein, dessert]
+ *                   enum: [coffee, drink, decaffeine, dessert]
  *                   example: coffee
  *                 items:
  *                   type: array
@@ -54,7 +54,7 @@ router.get("/confirm/menu/:type", async (req, res) => {
   const typeMap = {
     coffee: "커피",
     drink: "음료",
-    decaffein: "디카페인",
+    decaffeine: "디카페인",
     dessert: "디저트",
   };
 
