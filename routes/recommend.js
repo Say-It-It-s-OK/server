@@ -2,102 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const Order = require("../models/orders");
-
-/**
- * @swagger
- * /recommend/{type}:
- *   get:
- *     summary: 타입별 인기 메뉴 추천
- *     description: 커피, 음료, 디카페인, 디저트 중 선택된 타입의 상위 3개 메뉴를 추천합니다.
- *     parameters:
- *       - in: path
- *         name: type
- *         required: true
- *         description: 추천할 메뉴 타입 (coffee, drink, decaffeine, dessert)
- *         schema:
- *           type: string
- *           enum: [coffee, drink, decaffeine, dessert]
- *     responses:
- *       200:
- *         description: 추천된 메뉴 리스트
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 response:
- *                   type: string
- *                   example: query.recommend
- *                 speech:
- *                   type: string
- *                   example: 커피 메뉴 중 인기 메뉴를 추천해드릴게요
- *                 page:
- *                   type: string
- *                   example: coffee
- *                 items:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                       name:
- *                         type: string
- *                       totalOrders:
- *                         type: number
- */
-
-const typeMap = {
-  coffee: "커피",
-  drink: "음료",
-  decaffeine: "디카페인",
-  dessert: "디저트",
-};
-
-router.get("/:type", async (req, res) => {
-  const { type } = req.params;
-  const menuType = typeMap[type];
-
-  if (!menuType) {
-    return res.status(400).json({ error: "잘못된 메뉴 타입입니다." });
-  }
-
-  try {
-    const results = await Order.aggregate([
-      {
-        $lookup: {
-          from: "Menu",
-          localField: "menu_id",
-          foreignField: "id",
-          as: "menu"
-        }
-      },
-      { $unwind: "$menu" },
-      { $match: { "menu.type": menuType } },
-      {
-        $group: {
-          _id: "$menu_id",
-          id: { $first: "$menu.id" },
-          name: { $first: "$menu.name" },
-          totalOrders: { $sum: "$quantity" }
-        }
-      },
-      { $sort: { totalOrders: -1 } },
-      { $limit: 3 }
-    ]);
-
-    res.json({
-      response: "query.recommend",
-      speech: `${menuType} 메뉴 중 인기 메뉴를 추천해드릴게요`,
-      page: type,
-      items: results,
-    });
-  } catch (err) {
-    console.error("추천 조회 오류:", err);
-    res.status(500).json({ error: "추천 처리 중 오류 발생" });
-  }
-});
-
+const { handleRecommend } = require("../controllers/recommendController");
 
 /**
  * @swagger
@@ -209,5 +114,67 @@ router.get("/cost/low", async (req, res) => {
   });
 
 
+/**
+ * @swagger
+ * /recommend:
+ *   post:
+ *     summary: 조건 기반 메뉴 추천
+ *     description: 카테고리, 태그 등을 기준으로 추천된 메뉴를 반환합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               request:
+ *                 type: string
+ *                 example: query.recommend
+ *               payload:
+ *                 type: object
+ *                 properties:
+ *                   categories:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     example: ["coffee", "drink"]
+ *                   filters:
+ *                     type: object
+ *                     properties:
+ *                       tag:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["popular"]
+ *     responses:
+ *       200:
+ *         description: 추천된 메뉴 리스트
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 response:
+ *                   type: string
+ *                   example: query.recommend
+ *                 speech:
+ *                   type: string
+ *                 page:
+ *                   type: string
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                       price:
+ *                         type: number
+ */
+router.post("/", handleRecommend);
 
 module.exports = router;
