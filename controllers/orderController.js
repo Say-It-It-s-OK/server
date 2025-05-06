@@ -58,7 +58,9 @@ exports.handleOrder = async (req, res) => {
   // query.order.pay
   if (request === "query.order.pay") {
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "유효한 주문 데이터가 필요합니다." });
+      return res
+        .status(400)
+        .json({ error: "유효한 주문 데이터가 필요합니다." });
     }
 
     const orderTime = new Date();
@@ -79,7 +81,7 @@ exports.handleOrder = async (req, res) => {
       order_id: orderId,
       order_date: orderTime,
       menu_id,
-      quantity
+      quantity,
     }));
 
     try {
@@ -89,11 +91,13 @@ exports.handleOrder = async (req, res) => {
         response: "query.order.pay",
         speech: "결제를 진행합니다",
         page: "payment",
-        order_id: orderId
+        order_id: orderId,
       });
     } catch (err) {
       console.error("주문 저장 오류:", err);
-      return res.status(500).json({ error: "주문 처리 중 오류가 발생했습니다." });
+      return res
+        .status(500)
+        .json({ error: "주문 처리 중 오류가 발생했습니다." });
     }
   }
 
