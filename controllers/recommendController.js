@@ -2,11 +2,7 @@ const Menu = require("../models/menu");
 const Order = require("../models/orders");
 
 exports.handleRecommend = async (req, res) => {
-<<<<<<< HEAD
-    const { request } = req.body;
-=======
   const { request, payload } = req.body;
->>>>>>> main
 
   const typeMap = {
     coffee: "커피",
