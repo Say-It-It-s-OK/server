@@ -3,126 +3,68 @@ const express = require("express");
 const recommendController = require("../controllers/recommendController");
 const router = express.Router();
 const Order = require("../models/orders");
+const { handleRecommend } = require("../controllers/recommendController");
 
 /**
  * @swagger
- * /recommend/{type}:
- *   get:
- *     summary: 타입별 인기 메뉴 추천
- *     description: 커피, 음료, 디카페인, 디저트 중 선택된 타입의 상위 3개 메뉴를 추천합니다.
- *     parameters:
- *       - in: path
- *         name: type
- *         required: true
- *         description: 추천할 메뉴 타입 (coffee, drink, decaffeine, dessert)
- *         schema:
- *           type: string
- *           enum: [coffee, drink, decaffeine, dessert]
- *     responses:
- *       200:
- *         description: 추천된 메뉴 리스트
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 response:
- *                   type: string
- *                   example: query.recommend
- *                 speech:
- *                   type: string
- *                   example: 커피 메뉴 중 인기 메뉴를 추천해드릴게요
- *                 page:
- *                   type: string
- *                   example: coffee
- *                 items:
- *                   type: array
- *                   items:
+ * /recommend:
+ *   post:
+ *     summary: 통합 조건 기반 메뉴 추천
+ *     description: 카테고리, 태그, 가격, 카페인, 포함/제외 재료를 고려하여 추천 메뉴를 반환합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               request:
+ *                 type: string
+ *                 example: query.recommend
+ *               payload:
+ *                 type: object
+ *                 properties:
+ *                   categories:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     example: ["coffee", "dessert"]
+ *                   filters:
  *                     type: object
  *                     properties:
- *                       id:
+ *                       tag:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["popular", "sweet"]
+ *                       caffeine:
  *                         type: string
- *                       name:
- *                         type: string
- *                       totalOrders:
- *                         type: number
- */
-
-const typeMap = {
-  coffee: "커피",
-  drink: "음료",
-  decaffeine: "디카페인",
-  dessert: "디저트",
-};
-
-router.get("/:type", async (req, res) => {
-  const { type } = req.params;
-  const menuType = typeMap[type];
-
-  if (!menuType) {
-    return res.status(400).json({ error: "잘못된 메뉴 타입입니다." });
-  }
-
-  try {
-    const results = await Order.aggregate([
-      {
-        $lookup: {
-          from: "Menu",
-          localField: "menu_id",
-          foreignField: "id",
-          as: "menu"
-        }
-      },
-      { $unwind: "$menu" },
-      { $match: { "menu.type": menuType } },
-      {
-        $group: {
-          _id: "$menu_id",
-          id: { $first: "$menu.id" },
-          name: { $first: "$menu.name" },
-          totalOrders: { $sum: "$quantity" }
-        }
-      },
-      { $sort: { totalOrders: -1 } },
-      { $limit: 3 }
-    ]);
-
-    res.json({
-      response: "query.recommend",
-      speech: `${menuType} 메뉴 중 인기 메뉴를 추천해드릴게요`,
-      page: type,
-      items: results,
-    });
-  } catch (err) {
-    console.error("추천 조회 오류:", err);
-    res.status(500).json({ error: "추천 처리 중 오류 발생" });
-  }
-});
-
-
-/**
- * @swagger
- * /recommend/cost/low:
- *   get:
- *     summary: 가격/타입 조건으로 메뉴 추천
- *     description: 가격 이하의 메뉴 또는 타입별로 필터링된 추천 메뉴를 반환합니다.
- *     parameters:
- *       - in: query
- *         name: price
- *         schema:
- *           type: number
- *         required: true
- *         description: 가격 상한선 (이 값 이하의 메뉴만 반환)
- *       - in: query
- *         name: type
- *         schema:
- *           type: string
- *           enum: [coffee, drink, decaffeine, dessert]
- *         required: false
- *         description: 메뉴 타입 (선택 사항)
+ *                         example: "decaffeine"
+ *                       price:
+ *                         type: object
+ *                         properties:
+ *                           min:
+ *                             type: number
+ *                             example: 2000
+ *                           max:
+ *                             type: number
+ *                             example: 5000
+ *                           sort:
+ *                             type: string
+ *                             enum: [asc, desc]
+ *                       include_ingredients:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["딸기", "우유"]
+ *                       exclude_ingredients:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["커피"]
  *     responses:
  *       200:
- *         description: 추천 메뉴 목록
+ *         description: 조건 기반 메뉴 추천 결과
  *         content:
  *           application/json:
  *             schema:
@@ -133,10 +75,10 @@ router.get("/:type", async (req, res) => {
  *                   example: query.recommend
  *                 speech:
  *                   type: string
- *                   example: 3000원 이하의 디저트 메뉴를 추천해드릴게요
+ *                   example: 조건에 맞춰 추천해드릴게요.
  *                 page:
  *                   type: string
- *                   example: recommend_price_low
+ *                   example: recommend_custom
  *                 items:
  *                   type: array
  *                   items:
@@ -153,6 +95,7 @@ router.get("/:type", async (req, res) => {
  *                       totalOrders:
  *                         type: number
  */
+<<<<<<< HEAD
 
 router.get("/cost/low", async (req, res) => {
     const maxPrice = Number(req.query.price);
@@ -221,5 +164,8 @@ router.get("/cost/low", async (req, res) => {
  */
 router.post("/", recommendController.handleRecommend);
 
+=======
+router.post("/", handleRecommend);
+>>>>>>> main
 
 module.exports = router;

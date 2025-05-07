@@ -1,116 +1,141 @@
 const Menu = require("../models/menu");
-const Order = require('../models/orders');
+const Order = require("../models/orders");
 
 exports.handleRecommend = async (req, res) => {
+<<<<<<< HEAD
     const { request } = req.body;
+=======
+  const { request, payload } = req.body;
+>>>>>>> main
 
-    const typeMap = {
-      coffee: "커피",
-      drink: "음료",
-      decaffeine: "디카페인",
-      dessert: "디저트",
+  const typeMap = {
+    coffee: "커피",
+    drink: "음료",
+    decaffeine: "디카페인",
+    dessert: "디저트",
+  };
+
+  if (request === "query.recommend") {
+    const { categories = [], filters = {} } = payload || {};
+    const {
+      tag = [],
+      caffeine,
+      price = {},
+      include_ingredients = [],
+      exclude_ingredients = []
+    } = filters;
+
+    const matchType = categories.map(c => typeMap[c] || c);
+    const includePopular = tag.includes("popular");
+    const filteredTags = tag.filter(t => t !== "popular");
+
+    const buildMatchStage = () => {
+      const andConditions = [];
+
+      if (matchType.length > 0) andConditions.push({ type: { $in: matchType } });
+      if (filteredTags.length > 0) andConditions.push({ tag: { $in: filteredTags } });
+
+      if (caffeine) {
+        const caffeineMap = { decaffeine: "decaffeine", caffeine: "caffeine" };
+        andConditions.push({ caffeine: caffeineMap[caffeine] || caffeine });
+      }
+
+      if (include_ingredients.length > 0) {
+        andConditions.push({ ingredient: { $all: include_ingredients } });
+      }
+
+      if (exclude_ingredients.length > 0) {
+        andConditions.push({ ingredient: { $not: { $in: exclude_ingredients } } });
+      }
+
+      if (price.min || price.max) {
+        const priceFilter = {};
+        if (price.min) priceFilter.$gte = price.min;
+        if (price.max) priceFilter.$lte = price.max;
+        andConditions.push({ price: priceFilter });
+      }
+
+      return andConditions.length > 0 ? { $and: andConditions } : {};
     };
 
-    // query.recommend.[type]
-    if (request.startsWith("query.recommend.")) {
-      const typeKey = request.split(".")[2];
-      const menuType = typeMap[typeKey];
-  
-      if (!menuType) {
-        return res.status(400).json({ error: "유효하지 않은 추천 타입입니다." });
-      }
-  
-      try {
-        // 메뉴 판매량 기준 상위 3개 추천
-        const topMenus = await Order.aggregate([
-          {
-            $lookup: {
-              from: "Menu", // 실제 MongoDB 컬렉션 이름에 따라 'menus'일 수도 있음
-              localField: "menu_id",
-              foreignField: "id",
-              as: "menu"
+    try {
+      // popular 태그가 있는 경우 → 판매량 기준 추천
+      if (tag.length > 0 && includePopular) {
+        const match = buildMatchStage();
+
+        const menuMatch = match.$and
+          ? {
+              $and: match.$and.map(condition => {
+                const remap = {};
+                for (const key in condition) {
+                  remap[`menu.${key}`] = condition[key];
+                }
+                return remap;
+              }),
             }
-          },
-          { $unwind: "$menu" },
-          { $match: { "menu.type": menuType } },
-          {
-            $group: {
-              _id: "$menu_id",
-              name: { $first: "$menu.name" },
-              type: { $first: "$menu.type" },
-              price: { $first: "$menu.price" },
-              totalOrders: { $sum: "$quantity" }
-            }
-          },
-          { $sort: { totalOrders: -1 } },
-          { $limit: 3 }
-        ]);
-  
-        return res.json({
-          response: "query.recommend",
-          speech: `${menuType} 메뉴 중 인기 메뉴를 추천해드릴게요`,
-          page: typeKey,
-          items: topMenus
-        });
-      } catch (err) {
-        console.error("추천 API 오류:", err);
-        return res.status(500).json({ error: "추천 처리 중 오류 발생" });
-      }
-    }  
-  
-    // query.recommend.cost.low(타입도 같이 넣음)
-    if (request === "query.recommend.cost.low") {
-      const maxPrice = Number(price);
-      const menuType = type ? typeMap[type] : null;
-  
-      if (!maxPrice || isNaN(maxPrice)) {
-        return res.status(400).json({ error: "유효한 가격 값이 필요합니다." });
-      }
-  
-      const matchStage = {
-        "menu.price": { $lte: maxPrice }
-      };
-      if (menuType) matchStage["menu.type"] = menuType;
-  
-      try {
-        const filteredMenus = await Order.aggregate([
+          : {};
+
+        const results = await Order.aggregate([
           {
             $lookup: {
               from: "Menu",
               localField: "menu_id",
               foreignField: "id",
-              as: "menu"
-            }
+              as: "menu",
+            },
           },
           { $unwind: "$menu" },
-          { $match: matchStage },
+          { $match: menuMatch },
           {
             $group: {
-              _id: "$menu_id",
+              _id: "$menu.id",
               id: { $first: "$menu.id" },
               name: { $first: "$menu.name" },
               type: { $first: "$menu.type" },
               price: { $first: "$menu.price" },
-              totalOrders: { $sum: "$quantity" }
-            }
+              totalOrders: { $sum: "$quantity" },
+            },
           },
-          { $sort: { totalOrders: -1 } } // ← limit 제거로 전체 추천
+          { $sort: { totalOrders: -1 } },
+          { $limit: 1 },
         ]);
-  
-        const speechText = menuType
-          ? `${maxPrice}원 이하의 ${menuType} 메뉴를 추천해드릴게요`
-          : `${maxPrice}원 이하의 메뉴를 추천해드릴게요`;
-  
+
         return res.json({
           response: "query.recommend",
-          speech: speechText,
-          page: "recommend_price_low",
-          items: filteredMenus
+          speech: "인기 기준으로 추천해드릴게요.",
+          page: "recommend_custom",
+          items: results,
         });
-      } catch (err) {
-        console.error("가격 + 타입 필터 추천 오류:", err);
-        return res.status(500).json({ error: "추천 처리 중 오류 발생" });
+      } else {
+        // popular 없을 때: 필터 조건 기반 랜덤 추천
+        const match = buildMatchStage();
+        const pipeline = [];
+
+        if (Object.keys(match).length > 0) pipeline.push({ $match: match });
+
+        if (price.sort === "asc") {
+          pipeline.push({ $sort: { price: 1 } });
+        } else if (price.sort === "desc") {
+          pipeline.push({ $sort: { price: -1 } });
+        }
+
+        if (price.sort) pipeline.push({ $limit: 1 });
+        else pipeline.push({ $sample: { size: 1 } });
+
+        const results = await Menu.aggregate(pipeline);
+
+        return res.json({
+          response: "query.recommend",
+          speech: "조건에 맞춰 추천해드릴게요.",
+          page: "recommend_custom",
+          items: results,
+        });
       }
+    } catch (err) {
+      console.error("추천 오류:", err);
+      return res.status(500).json({ error: "추천 처리 중 오류가 발생했습니다." });
     }
-    
-}
+  }
+
+  return res.status(400).json({ error: "지원하지 않는 request입니다." });
+};
