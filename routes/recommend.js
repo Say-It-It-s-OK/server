@@ -118,8 +118,8 @@ router.get("/cost/low", async (req, res) => {
  * @swagger
  * /recommend:
  *   post:
- *     summary: 조건 기반 메뉴 추천
- *     description: 카테고리, 태그 등을 기준으로 추천된 메뉴를 반환합니다.
+ *     summary: 통합 조건 기반 메뉴 추천
+ *     description: 카테고리, 태그, 가격, 카페인, 포함/제외 재료를 고려하여 추천 메뉴를 반환합니다.
  *     requestBody:
  *       required: true
  *       content:
@@ -137,7 +137,7 @@ router.get("/cost/low", async (req, res) => {
  *                     type: array
  *                     items:
  *                       type: string
- *                     example: ["coffee", "drink"]
+ *                     example: ["coffee", "dessert"]
  *                   filters:
  *                     type: object
  *                     properties:
@@ -145,10 +145,35 @@ router.get("/cost/low", async (req, res) => {
  *                         type: array
  *                         items:
  *                           type: string
- *                         example: ["popular"]
+ *                         example: ["popular", "sweet"]
+ *                       caffeine:
+ *                         type: string
+ *                         example: "decaffeine"
+ *                       price:
+ *                         type: object
+ *                         properties:
+ *                           min:
+ *                             type: number
+ *                             example: 2000
+ *                           max:
+ *                             type: number
+ *                             example: 5000
+ *                           sort:
+ *                             type: string
+ *                             enum: [asc, desc]
+ *                       include_ingredients:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["딸기", "우유"]
+ *                       exclude_ingredients:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["커피"]
  *     responses:
  *       200:
- *         description: 추천된 메뉴 리스트
+ *         description: 조건 기반 메뉴 추천 결과
  *         content:
  *           application/json:
  *             schema:
@@ -159,8 +184,10 @@ router.get("/cost/low", async (req, res) => {
  *                   example: query.recommend
  *                 speech:
  *                   type: string
+ *                   example: 조건에 맞춰 추천해드릴게요.
  *                 page:
  *                   type: string
+ *                   example: recommend_custom
  *                 items:
  *                   type: array
  *                   items:
@@ -173,6 +200,8 @@ router.get("/cost/low", async (req, res) => {
  *                       type:
  *                         type: string
  *                       price:
+ *                         type: number
+ *                       totalOrders:
  *                         type: number
  */
 router.post("/", handleRecommend);
