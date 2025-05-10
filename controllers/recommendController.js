@@ -1,8 +1,15 @@
+const { v4: uuidv4 } = require("uuid");
 const Menu = require("../models/menu");
 const Order = require("../models/orders");
+const cache = require("../utils/BackendCache");
+const sessionHelper = require("../utils/sessionHelper");
+
 
 exports.handleRecommend = async (req, res) => {
-  const { request, payload } = req.body;
+  const sessionId = sessionHelper.ensureSession(req); 
+  const { request, payload, action } = req.body;
+  const currentSessionId = sessionId;
+  cache.initSession(currentSessionId);
 
   const typeMap = {
     coffee: "커피",
@@ -11,8 +18,17 @@ exports.handleRecommend = async (req, res) => {
     dessert: "디저트",
   };
 
-  if (request === "query.recommend") {
-    const { categories = [], filters = {} } = payload || {};
+  // action: retry (이전 추천 조건 재사용)
+  if (request === "query.recommend" || action === "retry") {
+    let filtersPayload = payload;
+    if (action === "retry") {
+      filtersPayload = cache.getLastFilters(currentSessionId);
+      if (!filtersPayload) {
+        return res.status(400).json({ error: "재추천을 위한 조건이 없습니다." });
+      }
+    }
+
+    const { categories = [], filters = {} } = filtersPayload || {};
     const {
       tag = [],
       caffeine,
@@ -24,6 +40,8 @@ exports.handleRecommend = async (req, res) => {
     const matchType = categories.map(c => typeMap[c] || c);
     const includePopular = tag.includes("popular");
     const filteredTags = tag.filter(t => t !== "popular");
+
+    const excluded = cache.getRecommendedIds(currentSessionId, filtersPayload);
 
     const buildMatchStage = () => {
       const andConditions = [];
@@ -51,11 +69,14 @@ exports.handleRecommend = async (req, res) => {
         andConditions.push({ price: priceFilter });
       }
 
+      if (excluded.length > 0) {
+        andConditions.push({ id: { $nin: excluded } });
+      }
+
       return andConditions.length > 0 ? { $and: andConditions } : {};
     };
 
     try {
-      // popular 태그가 있는 경우 → 판매량 기준 추천
       if (tag.length > 0 && includePopular) {
         const match = buildMatchStage();
 
@@ -89,6 +110,8 @@ exports.handleRecommend = async (req, res) => {
               name: { $first: "$menu.name" },
               type: { $first: "$menu.type" },
               price: { $first: "$menu.price" },
+              options: { $first: "$menu.options" },
+              ingredient: { $first: "$menu.ingredient" },
               totalOrders: { $sum: "$quantity" },
             },
           },
@@ -96,14 +119,18 @@ exports.handleRecommend = async (req, res) => {
           { $limit: 1 },
         ]);
 
+        if (results.length > 0) {
+          cache.addRecommendations(currentSessionId, filtersPayload, results);
+        }
+
         return res.json({
           response: "query.recommend",
           speech: "인기 기준으로 추천해드릴게요.",
           page: "recommend_custom",
+          sessionId: currentSessionId,
           items: results,
         });
       } else {
-        // popular 없을 때: 필터 조건 기반 랜덤 추천
         const match = buildMatchStage();
         const pipeline = [];
 
@@ -120,10 +147,15 @@ exports.handleRecommend = async (req, res) => {
 
         const results = await Menu.aggregate(pipeline);
 
+        if (results.length > 0) {
+          cache.addRecommendations(currentSessionId, filtersPayload, results);
+        }
+
         return res.json({
           response: "query.recommend",
           speech: "조건에 맞춰 추천해드릴게요.",
           page: "recommend_custom",
+          sessionId: currentSessionId,
           items: results,
         });
       }

@@ -1,90 +1,89 @@
+// controllers/orderController.js
 const Menu = require("../models/menu");
 const Order = require("../models/orders");
+const cache = require("../utils/BackendCache");
+const sessionHelper = require("../utils/sessionHelper");
 
 exports.handleOrder = async (req, res) => {
-  const { request, type, options, items, cart, order } = req.body;
+  const sessionId = sessionHelper.ensureSession(req);
+  const { request, payload } = req.body;
+  const actionType = request.split(".")[2]; // add, update, delete, pay
 
-  const typeMap = {
-    coffee: "커피",
-    decaffeine: "디카페인",
-    drink: "음료",
-    dessert: "디저트",
-  };
-
-  // query.order.add
-  if (request === "query.order.add") {
-    const menuType = typeMap[type?.[0]];
-
-    if (!menuType) {
-      return res.status(400).json({ error: "유효하지 않은 메뉴 타입입니다" });
+  try {
+    if (actionType === "add") {
+      const items = Array.isArray(payload.item) ? payload.item : [payload.item];
+    
+      for (const item of items) {
+        if (!item || !item.name) continue;
+    
+        // 가격이 없다면 DB에서 메뉴 정보 조회
+        if (!item.price) {
+          const menu = await Menu.findOne({ name: item.name });
+          if (!menu) {
+            console.warn(`[WARN] ${item.name} 메뉴를 찾을 수 없습니다.`);
+            continue;
+          }
+          item.price = menu.price;
+        }
+    
+        cache.addToCart(sessionId, item);
+      }
+    
+      return res.json({
+        response: request,
+        speech: `${items.length}개의 항목을 장바구니에 추가했어요.`,
+        sessionId,
+        page: "order_add",
+      });
     }
-
-    return res.json({
-      response: "query.order.add",
-      speech: `${menuType} 메뉴를 장바구니에 추가했습니다`,
-      page: "cart",
-      type,
-      options,
-    });
-  }
-
-  // query.order.update
-  if (request === "query.order.update") {
-    const menuType = typeMap[type?.[0]];
-
-    if (!menuType) {
-      return res.status(400).json({ error: "유효하지 않은 메뉴 타입입니다" });
-    }
-
-    return res.json({
-      response: "query.order.update",
-      speech: `${menuType} 옵션을 변경하였습니다`,
-      page: "option",
-      type,
-      options,
-    });
-  }
-
-  // query.order.delete
-  if (request === "query.order.delete") {
-    return res.json({
-      response: "query.order.delete",
-      speech: "선택한 상품을 장바구니에서 삭제했습니다",
-      page: "cart",
-      items,
-    });
-  }
-
-  // query.order.pay
-  if (request === "query.order.pay") {
-    if (!Array.isArray(order) || order.length === 0) {
-      return res.status(400).json({ error: "유효한 주문 데이터가 필요합니다." });
-    }
-
-    const orderTime = new Date();
-    const orderId = `ORD${orderTime.getTime()}`;
-
-    const orderDocs = order.map((item) => ({
-      order_id: orderId,
-      order_date: orderTime,
-      menu_id: item.menu_id,
-      quantity: item.quantity
-    }));
-
-    try {
-      await Order.insertMany(orderDocs);
+    
+    if (actionType === "update") {
+      const item = payload.item;
+      const cart = cache.getCart(sessionId);
+      const updatedCart = cart.map(c =>
+        c.name === item.name ? { ...c, ...item } : c
+      );
+      cache.setCart(sessionId, updatedCart);
 
       return res.json({
-        response: "query.order.pay",
-        speech: "결제를 진행합니다",
-        page: "payment",
-        order_id: orderId
+        response: request,
+        speech: `${item.name}의 옵션을 수정했어요.`,
+        sessionId,
+        page: "order_update",
       });
-    } catch (err) {
-      console.error("주문 저장 오류:", err);
-      return res.status(500).json({ error: "주문 처리 중 오류가 발생했습니다." });
     }
-  }
 
-  return res.status(400).json({ error: "지원하지 않는 요청입니다." });
+    if (actionType === "delete") {
+      const item = payload.item;
+      const cart = cache.getCart(sessionId);
+      const newCart = cart.filter(c => c.name !== item.name);
+      cache.setCart(sessionId, newCart);
+
+      return res.json({
+        response: request,
+        speech: `${item.name}을(를) 장바구니에서 삭제했어요.`,
+        sessionId,
+        page: "order_delete",
+      });
+    }
+
+    if (actionType === "pay") {
+      const cart = cache.getCart(sessionId);
+      const total = cart.reduce((sum, i) => sum + i.price * (i.count || 1), 0);
+      cache.clearSession(sessionId);
+
+      return res.json({
+        response: request,
+        speech: `결제가 완료되었습니다. 총 ${total}원이에요.`,
+        sessionId,
+        page: "order_pay",
+        total,
+      });
+    }
+
+    return res.status(400).json({ error: "지원하지 않는 order 타입입니다." });
+  } catch (err) {
+    console.error("order 처리 오류:", err);
+    return res.status(500).json({ error: "주문 처리 중 오류가 발생했습니다." });
+  }
 };
