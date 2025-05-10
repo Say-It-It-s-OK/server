@@ -150,6 +150,8 @@ router.get("/confirm/details", async (req, res) => {
  *       200:
  *         description: 쿼리 처리 결과 반환
  */
-router.post("/", queryController.handleQuery);
+
+router.post("/confirm", queryController.handleConfirm);
+router.post("/", queryController.handleConfirm);
 
 module.exports = router;
