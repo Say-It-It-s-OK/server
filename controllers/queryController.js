@@ -22,11 +22,12 @@ exports.handleConfirm = async (req, res) => {
       const result = await Menu.find(
         categories.length > 0 ? { type: { $in: categories } } : {}
       );
+      const pageValue = categories.length === 1 ? categories[0] : "menu";
 
       return res.json({
         response: request,
         speech: `${categories.join(", ")} 메뉴를 보여드릴게요.`,
-        page: "confirm_menu",
+        page: pageValue,
         items: result,
       });
 
