@@ -42,8 +42,18 @@ function setCart(sessionId, cartItems) {
 function addRecommendations(sessionId, filters, items) {
   initSession(sessionId);
   const key = JSON.stringify(filters);
-  sessions[sessionId].recommended[key] = items.map(item => item.id);
+  const newIds = items.map(item => item.id);
+  const existingIds = sessions[sessionId].recommended[key] || [];
+
+  // 중복 없이 누적
+  const merged = [...new Set([...existingIds, ...newIds])];
+  sessions[sessionId].recommended[key] = merged;
+
   sessions[sessionId].filters = filters; // 최신 조건 저장
+
+  console.log(`[추천 캐시 저장] 세션: ${sessionId}`);
+  console.log(`- 조건: ${key}`);
+  console.log(`- 추천된 메뉴 ID 누적:`, merged);
 }
 
 function getRecommendedIds(sessionId, filters) {

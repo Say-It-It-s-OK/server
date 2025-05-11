@@ -4,12 +4,14 @@ const Order = require("../models/orders");
 const cache = require("../utils/BackendCache");
 const sessionHelper = require("../utils/sessionHelper");
 
-
-exports.handleRecommend = async (req, res) => {
+exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) => {
   const sessionId = sessionHelper.ensureSession(req); 
-  const { request, payload, action } = req.body;
+  const { request, payload: bodyPayload, action: bodyAction } = req.body;
   const currentSessionId = sessionId;
   cache.initSession(currentSessionId);
+
+  const payload = payloadArg || bodyPayload;
+  const action = actionArg || bodyAction;
 
   const typeMap = {
     coffee: "커피",
@@ -18,7 +20,6 @@ exports.handleRecommend = async (req, res) => {
     dessert: "디저트",
   };
 
-  // action: retry (이전 추천 조건 재사용)
   if (request === "query.recommend" || action === "retry") {
     let filtersPayload = payload;
     if (action === "retry") {
@@ -34,7 +35,8 @@ exports.handleRecommend = async (req, res) => {
       caffeine,
       price = {},
       include_ingredients = [],
-      exclude_ingredients = []
+      exclude_ingredients = [],
+      count = 1
     } = filters;
 
     const matchType = categories.map(c => typeMap[c] || c);
@@ -77,9 +79,9 @@ exports.handleRecommend = async (req, res) => {
     };
 
     try {
-      if (tag.length > 0 && includePopular) {
-        const match = buildMatchStage();
+      const match = buildMatchStage();
 
+      if (includePopular) {
         const menuMatch = match.$and
           ? {
               $and: match.$and.map(condition => {
@@ -116,8 +118,14 @@ exports.handleRecommend = async (req, res) => {
             },
           },
           { $sort: { totalOrders: -1 } },
-          { $limit: 1 },
+          { $limit: count },
         ]);
+
+        const responseSpeech = results.length === 0
+          ? "더 이상 추천해드릴 수 있는 메뉴가 없어요."
+          : results.length < count
+          ? `${results.length}개만 추천이 가능해요. 인기 메뉴를 알려드릴게요.`
+          : "인기 기준으로 추천해드릴게요.";
 
         if (results.length > 0) {
           cache.addRecommendations(currentSessionId, filtersPayload, results);
@@ -125,13 +133,12 @@ exports.handleRecommend = async (req, res) => {
 
         return res.json({
           response: "query.recommend",
-          speech: "인기 기준으로 추천해드릴게요.",
+          speech: responseSpeech,
           page: "recommend_custom",
-          sessionId: currentSessionId,
+          currentSessionId,
           items: results,
         });
       } else {
-        const match = buildMatchStage();
         const pipeline = [];
 
         if (Object.keys(match).length > 0) pipeline.push({ $match: match });
@@ -140,12 +147,19 @@ exports.handleRecommend = async (req, res) => {
           pipeline.push({ $sort: { price: 1 } });
         } else if (price.sort === "desc") {
           pipeline.push({ $sort: { price: -1 } });
+        } else {
+          pipeline.push({ $sample: { size: count } });
         }
 
-        if (price.sort) pipeline.push({ $limit: 1 });
-        else pipeline.push({ $sample: { size: 1 } });
+        if (price.sort) pipeline.push({ $limit: count });
 
         const results = await Menu.aggregate(pipeline);
+
+        const responseSpeech = results.length === 0
+          ? "조건에 맞는 메뉴가 더 이상 없어요."
+          : results.length < count
+          ? `${results.length}개만 조건에 맞는 메뉴가 있어요. 추천해드릴게요.`
+          : "조건에 맞춰 추천해드릴게요.";
 
         if (results.length > 0) {
           cache.addRecommendations(currentSessionId, filtersPayload, results);
@@ -153,7 +167,7 @@ exports.handleRecommend = async (req, res) => {
 
         return res.json({
           response: "query.recommend",
-          speech: "조건에 맞춰 추천해드릴게요.",
+          speech: responseSpeech,
           page: "recommend_custom",
           sessionId: currentSessionId,
           items: results,

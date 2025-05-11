@@ -2,15 +2,17 @@ const recommendController = require("./recommendController");
 const queryController = require("./queryController");
 const orderController = require("./orderController");
 const cache = require("../utils/BackendCache");
+const sessionHelper = require("../utils/sessionHelper");
 
 exports.handleNLPRequest = async (req, res) => {
   const { request, payload } = req.body;
   const [group, action, subaction] = request.split(".");
+  const sessionId = sessionHelper.ensureSession(req);
 
   console.log("[NLP 요청 수신]", request, payload);
 
   try {
-    // 1. query 그룹 처리
+    // query 그룹
     if (group === "query") {
       if (action === "recommend") {
         return recommendController.handleRecommend(req, res, payload);
@@ -47,8 +49,31 @@ exports.handleNLPRequest = async (req, res) => {
         });
       }
 
+      if (action === "reply") {
+        const { action: replyAction } = payload;
+
+        if (replyAction === "retry") {
+          return recommendController.handleRecommend(req, res, null, "retry");
+        }
+        if (replyAction === "accept") {
+          return res.json({
+            response: "query.reply",
+            speech: "좋아요! 선택하신 메뉴로 진행할게요.",
+            page: "confirm",
+          });
+        }
+        if (replyAction === "reject") {
+          return res.json({
+            response: "query.reply",
+            speech: "알겠습니다. 다른 메뉴를 추천해드릴게요.",
+            page: "recommend_retry",
+          });
+        }
+
+        return res.status(400).json({ error: "알 수 없는 reply action입니다." });
+      }
+
       if (action === "exit") {
-        const sessionId = req.body.sessionId;
         if (sessionId) cache.clearSession(sessionId);
         return res.json({
           response: "query.exit",
@@ -57,7 +82,7 @@ exports.handleNLPRequest = async (req, res) => {
         });
       }
 
-      // query.order.x 요청도 예외적으로 허용
+      // 예외적으로 query.order.add 등 처리 허용
       if (request.startsWith("query.order.")) {
         return orderController.handleOrder(req, res);
       }

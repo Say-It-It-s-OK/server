@@ -12,10 +12,12 @@ exports.handleOrder = async (req, res) => {
   try {
     if (actionType === "add") {
       const items = Array.isArray(payload.item) ? payload.item : [payload.item];
-    
+      const addedItems = [];
+      const missingOptionItems = [];
+
       for (const item of items) {
         if (!item || !item.name) continue;
-    
+
         // 가격이 없다면 DB에서 메뉴 정보 조회
         if (!item.price) {
           const menu = await Menu.findOne({ name: item.name });
@@ -25,29 +27,75 @@ exports.handleOrder = async (req, res) => {
           }
           item.price = menu.price;
         }
-    
+
+        const missing = [];
+        if (!item.size) missing.push("사이즈");
+        if (!item.temperature) missing.push("온도");
+
+        if (missing.length > 0) {
+          missingOptionItems.push({ name: item.name, missing });
+        }
+
         cache.addToCart(sessionId, item);
+        addedItems.push(item);
       }
-    
-      return res.json({
+
+      let speech = `${addedItems.length}개의 항목을 장바구니에 추가했어요.`;
+      let page = "order_add";
+      const response = {
         response: request,
-        speech: `${items.length}개의 항목을 장바구니에 추가했어요.`,
+        speech,
         sessionId,
-        page: "order_add",
-      });
+        page,
+        items: addedItems,
+      };
+
+      if (missingOptionItems.length > 0) {
+        const prompts = missingOptionItems.map(item =>
+          `${item.name}의 ${item.missing.join("와 ")}`
+        );
+        response.speech += ` ${prompts.join(", ")}를 선택해 주세요.`;
+        response.page = "order_option_request";
+        response.needOptions = missingOptionItems;
+      }
+
+      console.log("[DEBUG] 장바구니 상태:", cache.getCart(sessionId));
+      return res.json(response);
     }
-    
+
     if (actionType === "update") {
-      const item = payload.item;
+      const item = payload.item || {};
+      const changes = payload.changes || {};
       const cart = cache.getCart(sessionId);
-      const updatedCart = cart.map(c =>
-        c.name === item.name ? { ...c, ...item } : c
-      );
-      cache.setCart(sessionId, updatedCart);
+
+      console.log("[DEBUG] 기존 장바구니:", cart);
+      console.log("[DEBUG] 업데이트 요청 항목 (changes):", changes);
+
+      // 우선순위: item.name > changes.name > cart.length === 1
+      let targetIndex = -1;
+      const name = item.name || changes.name;
+
+      if (name) {
+        targetIndex = cart.findIndex(c => c.name === name);
+      } else if (cart.length === 1) {
+        targetIndex = 0;
+      }
+
+      if (targetIndex === -1) {
+        return res.status(400).json({
+          error: "수정할 항목을 찾을 수 없습니다. 이름을 명시해주세요.",
+        });
+      }
+
+      const updatedItem = { ...cart[targetIndex], ...item, ...changes };
+      cart[targetIndex] = updatedItem;
+      cache.setCart(sessionId, cart);
+
+      console.log("[DEBUG] 수정 후 장바구니:", cache.getCart(sessionId));
 
       return res.json({
         response: request,
-        speech: `${item.name}의 옵션을 수정했어요.`,
+        speech: `${updatedItem.name}의 옵션을 수정했어요.`,
         sessionId,
         page: "order_update",
       });
