@@ -15,25 +15,42 @@ exports.handleOrder = async (req, res) => {
       const addedItems = [];
       const missingOptionItems = [];
 
+      const drinkTypes = ["coffee", "decaffeine", "drink"];
+
+      const typeMap = {
+        커피: "coffee",
+        디카페인: "decaffeine",
+        음료: "drink",
+        디저트: "dessert",
+      };
+
       for (const item of items) {
         if (!item || !item.name) continue;
 
+        item.type = typeMap[item.type] || item.type;
+
         // 가격이 없다면 DB에서 메뉴 정보 조회
-        if (!item.price) {
+        if (!item.price || !item.type || !drinkTypes.includes(item.type)) {
           const menu = await Menu.findOne({ name: item.name });
+
           if (!menu) {
             console.warn(`[WARN] ${item.name} 메뉴를 찾을 수 없습니다.`);
             continue;
           }
           item.price = menu.price;
+          item.type = typeMap[menu.type] || menu.type; // DB에서 타입 안채워도 되면 이 줄은 삭제
         }
 
-        const missing = [];
-        if (!item.size) missing.push("사이즈");
-        if (!item.temperature) missing.push("온도");
+        const isDrink = drinkTypes.includes(item.type);
 
-        if (missing.length > 0) {
-          missingOptionItems.push({ name: item.name, missing });
+        if (isDrink) {
+          const missing = [];
+          if (!item.size) missing.push("사이즈");
+          if (!item.temperature) missing.push("온도");
+
+          if (missing.length > 0) {
+            missingOptionItems.push({ name: item.name, missing });
+          }
         }
 
         cache.addToCart(sessionId, item);
@@ -51,8 +68,8 @@ exports.handleOrder = async (req, res) => {
       };
 
       if (missingOptionItems.length > 0) {
-        const prompts = missingOptionItems.map(item =>
-          `${item.name}의 ${item.missing.join("와 ")}`
+        const prompts = missingOptionItems.map(
+          (item) => `${item.name}의 ${item.missing.join("와 ")}`
         );
         response.speech += ` ${prompts.join(", ")}를 선택해 주세요.`;
         response.page = "order_option_request";
@@ -76,7 +93,7 @@ exports.handleOrder = async (req, res) => {
       const name = item.name || changes.name;
 
       if (name) {
-        targetIndex = cart.findIndex(c => c.name === name);
+        targetIndex = cart.findIndex((c) => c.name === name);
       } else if (cart.length === 1) {
         targetIndex = 0;
       }
@@ -104,7 +121,7 @@ exports.handleOrder = async (req, res) => {
     if (actionType === "delete") {
       const item = payload.item;
       const cart = cache.getCart(sessionId);
-      const newCart = cart.filter(c => c.name !== item.name);
+      const newCart = cart.filter((c) => c.name !== item.name);
       cache.setCart(sessionId, newCart);
 
       return res.json({
