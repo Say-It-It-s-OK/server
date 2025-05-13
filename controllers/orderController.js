@@ -13,49 +13,99 @@ exports.handleOrder = async (req, res) => {
     if (actionType === "add") {
       const items = Array.isArray(payload.item) ? payload.item : [payload.item];
       const addedItems = [];
-      const missingOptionItems = [];
+      // const missingOptionItems = [];
 
-      const drinkTypes = ["coffee", "decaffeine", "drink"];
+      // const drinkTypes = ["coffee", "decaffeine", "drink"];
 
-      const typeMap = {
-        커피: "coffee",
-        디카페인: "decaffeine",
-        음료: "drink",
-        디저트: "dessert",
-      };
+      // const typeMap = {
+      //   커피: "coffee",
+      //   디카페인: "decaffeine",
+      //   음료: "drink",
+      //   디저트: "dessert",
+      // };
 
       for (const item of items) {
         if (!item || !item.name) continue;
 
-        item.type = typeMap[item.type] || item.type;
+        // item.type = typeMap[item.type] || item.type;
 
-        // 가격이 없다면 DB에서 메뉴 정보 조회
-        if (!item.price || !item.type || !drinkTypes.includes(item.type)) {
-          const menu = await Menu.findOne({ name: item.name });
-
-          if (!menu) {
-            console.warn(`[WARN] ${item.name} 메뉴를 찾을 수 없습니다.`);
-            continue;
-          }
-          item.price = menu.price;
-          item.type = typeMap[menu.type] || menu.type; // DB에서 타입 안채워도 되면 이 줄은 삭제
+        // // 가격이 없다면 DB에서 메뉴 정보 조회
+        // if (!item.price || !item.type || !drinkTypes.includes(item.type)) {
+        const menu = await Menu.findOne({ name: item.name });
+        if (!menu) {
+          console.warn(`[WARN] ${item.name} 메뉴를 찾을 수 없습니다.`);
+          continue;
         }
 
-        const isDrink = drinkTypes.includes(item.type);
+        if(!item.price) item.price = menu.price;
+        item.type = menu.type;
 
-        if (isDrink) {
-          const missing = [];
-          if (!item.size) missing.push("사이즈");
-          if (!item.temperature) missing.push("온도");
+        // 디저트는 옵션 없이 바로 추가 
+        if(menu.type === "디저트"){
+          item.selectedOptions = {};
+          cache.addToCart(sessionId, item);
+          addedItems.push(item);
+          continue;
+        }
 
-          if (missing.length > 0) {
-            missingOptionItems.push({ name: item.name, missing });
-          }
+        const options = menu.options || {};
+        const fixedOptions = {};
+        const requiredOptions = [];
+
+        for(const key of Object.keys(options)){
+          const values = options[key];
+          if(!Array.isArray(values) || values.length === 0)
+            continue;
+
+          if(values.length === 1)
+              fixedOptions[key] = values[0];
+          else
+            requiredOptions.push(key);
+        }
+
+        for(const key of Object.keys(fixedOptions)){
+          item[key] = fixedOptions[key];
+        }
+
+        const missing = requiredOptions.filter(opt => !item[opt]);
+        
+        if(missing.length > 0){
+          cache.setPendingOrder(sessionId, {
+            currentAction: "order.add",
+            pendingItem: item,
+            needOptions: missing,
+            allOptions: options
+          });
+
+          return res.json({
+            response: request,
+            sessionId,
+            page: "order_option_required",
+            speech: `${item.name}의 ${missing.join("와 ")}를 선택해주세요`,
+            item: {name: item.name},
+            needOptions: missing,
+            options
+          });
+        }
+
+        item.selectedOptions = {};
+        for(const key of requiredOptions){
+          item.selectedOptions[key] = item[key];
         }
 
         cache.addToCart(sessionId, item);
         addedItems.push(item);
+        cache.clearPendingOrder(sessionId);
       }
+
+      return res.json({
+        response: request,
+        sessionId,
+        page: "order_add",
+        speech: `${addedItems.length}개의 항목을 장바구니에 추가했어요`,
+        items: addedItems
+      });
+    }
 
       let speech = `${addedItems.length}개의 항목을 장바구니에 추가했어요.`;
       let page = "order_add";
