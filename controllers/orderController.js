@@ -153,9 +153,9 @@ exports.handleOrder = async (req, res) => {
         }
       }
 
+      // 기존 장바구니 항목 수정 로직
       const cart = cache.getCart(sessionId);
       const name = item.name || changes.name;
-      // 우선순위: item.name > changes.name > cart.length === 1
       let targetIndex = -1;
 
       console.log("[DEBUG] 기존 장바구니:", cart);
