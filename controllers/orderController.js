@@ -1,4 +1,5 @@
 // controllers/orderController.js
+const menu = require("../models/menu");
 const Menu = require("../models/menu");
 const Order = require("../models/orders");
 const cache = require("../utils/BackendCache");
@@ -13,6 +14,7 @@ exports.handleOrder = async (req, res) => {
     if (actionType === "add") {
       const items = Array.isArray(payload.item) ? payload.item : [payload.item];
       const addedItems = [];
+      const required_option_keys = ["온도", "크기"];
       // const missingOptionItems = [];
 
       // const drinkTypes = ["coffee", "decaffeine", "drink"];
@@ -52,12 +54,26 @@ exports.handleOrder = async (req, res) => {
         const fixedOptions = {};
         const requiredOptions = [];
 
-        for (const key of Object.keys(options)) {
+        console.log("menu.options => ", menu.options);
+
+        for (const key of Object.keys(options._doc || {})) {
           const values = options[key];
+
           if (!Array.isArray(values) || values.length === 0) continue;
 
-          if (values.length === 1) fixedOptions[key] = values[0];
-          else requiredOptions.push(key);
+          if (values.length === 1) {
+            fixedOptions[key] = values[0];
+          }
+
+          if (required_option_keys.includes(key)) {
+            requiredOptions.push(key);
+          }
+          console.log(
+            "[DEBUG] 현재 key:",
+            key,
+            "| isRequired:",
+            required_option_keys.includes(key)
+          );
         }
 
         for (const key of Object.keys(fixedOptions)) {
@@ -66,7 +82,13 @@ exports.handleOrder = async (req, res) => {
 
         const missing = requiredOptions.filter((opt) => !item[opt]);
 
+        console.log("[DEBUG] 메뉴 옵션:", options);
+        console.log("[DEBUG] 필수 옵션:", requiredOptions);
+        console.log("[DEBUG] 누락된 옵션:", missing);
+
         if (missing.length > 0) {
+          console.log("[DEBUG] 옵션 누락 감지됨, pendingOrder로 이동");
+
           cache.setPendingOrder(sessionId, {
             currentAction: "order.add",
             pendingItem: item,
@@ -109,7 +131,11 @@ exports.handleOrder = async (req, res) => {
       const changes = payload.changes || {};
       const pending = cache.getPendingOrder(sessionId);
 
-      if (pending?.currentAction === "order_add" && pending?.pendingItem) {
+      console.log("[DEBUG] pendingOrder 상태:", pending);
+
+      if (pending?.currentAction === "order.add" && pending?.pendingItem) {
+        console.log("[DEBUG] 옵션 추가 흐름 진입");
+
         const updatedItem = { ...pending.pendingItem, ...item, ...changes };
         const stillMissing = pending.needOptions.filter(
           (opt) => !updatedItem[opt]
