@@ -107,14 +107,59 @@ exports.handleOrder = async (req, res) => {
     if (actionType === "update") {
       const item = payload.item || {};
       const changes = payload.changes || {};
+      const pending = cache.getPendingOrder(sessionId);
+
+      if (pending?.currentAction === "order_add" && pending?.pendingItem) {
+        const updatedItem = { ...pending.pendingItem, ...item, ...changes };
+        const stillMissing = pending.needOptions.filter(
+          (opt) => !updatedItem[opt]
+        );
+
+        if (stillMissing.length === 0) {
+          // option이 모두 채워진 경우 -> selectedOptions 구성 후 장바구니에 추가
+          updatedItem.selectedOptions = {};
+          for (const opt of pending.needOptions) {
+            updatedItem.selectedOptions[opt] = updatedItem[opt];
+          }
+
+          cache.addToCart(sessionId, updatedItem);
+          cache.clearPendingOrder(sessionId);
+
+          return res.json({
+            response: "query.order.add",
+            sessionId,
+            speech: `${updatedItem.name}를 장바구니에 추가했어요`,
+            page: "order_add",
+            items: [updatedItem],
+          });
+        } else {
+          // 옵션 선택이 완료되지 않은 경우 -> 다시 pending에 저장
+          cache.setPendingOrder(sessionId, {
+            ...pending,
+            pendingItem: updatedItem,
+            needOptions: stillMissing,
+          });
+
+          return res.json({
+            response: "query.order.add".sessionId,
+            speech: `${updatedItem.name}의 ${stillMissing.join(
+              "와 "
+            )}를 더 선택해주세요`,
+            page: "order_option_required",
+            item: { name: updatedItem.name },
+            needOptions: stillMissing,
+            options: pending.allOptions,
+          });
+        }
+      }
+
       const cart = cache.getCart(sessionId);
+      const name = item.name || changes.name;
+      // 우선순위: item.name > changes.name > cart.length === 1
+      let targetIndex = -1;
 
       console.log("[DEBUG] 기존 장바구니:", cart);
       console.log("[DEBUG] 업데이트 요청 항목 (changes):", changes);
-
-      // 우선순위: item.name > changes.name > cart.length === 1
-      let targetIndex = -1;
-      const name = item.name || changes.name;
 
       if (name) {
         targetIndex = cart.findIndex((c) => c.name === name);
