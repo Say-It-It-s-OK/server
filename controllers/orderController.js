@@ -37,11 +37,11 @@ exports.handleOrder = async (req, res) => {
           continue;
         }
 
-        if(!item.price) item.price = menu.price;
+        if (!item.price) item.price = menu.price;
         item.type = menu.type;
 
-        // 디저트는 옵션 없이 바로 추가 
-        if(menu.type === "디저트"){
+        // 디저트는 옵션 없이 바로 추가
+        if (menu.type === "디저트") {
           item.selectedOptions = {};
           cache.addToCart(sessionId, item);
           addedItems.push(item);
@@ -52,29 +52,26 @@ exports.handleOrder = async (req, res) => {
         const fixedOptions = {};
         const requiredOptions = [];
 
-        for(const key of Object.keys(options)){
+        for (const key of Object.keys(options)) {
           const values = options[key];
-          if(!Array.isArray(values) || values.length === 0)
-            continue;
+          if (!Array.isArray(values) || values.length === 0) continue;
 
-          if(values.length === 1)
-              fixedOptions[key] = values[0];
-          else
-            requiredOptions.push(key);
+          if (values.length === 1) fixedOptions[key] = values[0];
+          else requiredOptions.push(key);
         }
 
-        for(const key of Object.keys(fixedOptions)){
+        for (const key of Object.keys(fixedOptions)) {
           item[key] = fixedOptions[key];
         }
 
-        const missing = requiredOptions.filter(opt => !item[opt]);
-        
-        if(missing.length > 0){
+        const missing = requiredOptions.filter((opt) => !item[opt]);
+
+        if (missing.length > 0) {
           cache.setPendingOrder(sessionId, {
             currentAction: "order.add",
             pendingItem: item,
             needOptions: missing,
-            allOptions: options
+            allOptions: options,
           });
 
           return res.json({
@@ -82,14 +79,14 @@ exports.handleOrder = async (req, res) => {
             sessionId,
             page: "order_option_required",
             speech: `${item.name}의 ${missing.join("와 ")}를 선택해주세요`,
-            item: {name: item.name},
+            item: { name: item.name },
             needOptions: missing,
-            options
+            options,
           });
         }
 
         item.selectedOptions = {};
-        for(const key of requiredOptions){
+        for (const key of requiredOptions) {
           item.selectedOptions[key] = item[key];
         }
 
@@ -103,31 +100,8 @@ exports.handleOrder = async (req, res) => {
         sessionId,
         page: "order_add",
         speech: `${addedItems.length}개의 항목을 장바구니에 추가했어요`,
-        items: addedItems
-      });
-    }
-
-      let speech = `${addedItems.length}개의 항목을 장바구니에 추가했어요.`;
-      let page = "order_add";
-      const response = {
-        response: request,
-        speech,
-        sessionId,
-        page,
         items: addedItems,
-      };
-
-      if (missingOptionItems.length > 0) {
-        const prompts = missingOptionItems.map(
-          (item) => `${item.name}의 ${item.missing.join("와 ")}`
-        );
-        response.speech += ` ${prompts.join(", ")}를 선택해 주세요.`;
-        response.page = "order_option_request";
-        response.needOptions = missingOptionItems;
-      }
-
-      console.log("[DEBUG] 장바구니 상태:", cache.getCart(sessionId));
-      return res.json(response);
+      });
     }
 
     if (actionType === "update") {
