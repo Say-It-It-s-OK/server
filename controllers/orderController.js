@@ -4,6 +4,7 @@ const Menu = require("../models/menu");
 const Order = require("../models/orders");
 const cache = require("../utils/BackendCache");
 const sessionHelper = require("../utils/sessionHelper");
+const { v4: uuidv4 } = require("uuid");
 
 exports.handleOrder = async (req, res) => {
   const sessionId = sessionHelper.ensureSession(req);
