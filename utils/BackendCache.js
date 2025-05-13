@@ -102,4 +102,7 @@ module.exports = {
   getLastFilters,
   clearSession,
   getAllSessions,
+  setPendingOrder,
+  getPendingOrder,
+  clearPendingOrder,
 };
