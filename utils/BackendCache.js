@@ -1,5 +1,6 @@
 // 메모리 기반 세션 캐시 저장소
 const { v4: uuidv4 } = require("uuid");
+const { init } = require("../models/menu");
 const sessions = {};
 
 function initSession(sessionId) {
@@ -8,7 +9,7 @@ function initSession(sessionId) {
       cart: [],
       filters: {},
       recommended: {},
-      pendingOrder: null,
+      pendingOrders: [],
     };
   }
 }
@@ -23,18 +24,27 @@ function ensureSession(req) {
   return sessionId;
 }
 
-function setPendingOrder(sessionId, data) {
+function addPendingOrder(sessionId, pendingData) {
   initSession(sessionId);
-  sessions[sessionId].pendingOrder = data;
-}
-function getPendingOrder(sessionId) {
-  initSession(sessionId);
-  return sessions[sessionId].pendingOrder;
+  sessions[sessionId].pendingOrders.push(pendingData);
 }
 
-function clearPendingOrder(sessionId) {
+function getPendingOrder(sessionId) {
   initSession(sessionId);
-  sessions[sessionId].pendingOrder = null;
+  return sessions[sessionId].pendingOrders;
+}
+
+function updatePendingOrder(sessionId, id, updatedData) {
+  initSession(sessionId);
+  const idx = sessions[sessionId].pendingOrders.findIndex((p) => p.id === id);
+  if (idx !== -1) sessions[sessionId].pendingOrders[idx] = updatedData;
+}
+
+function removePendingOrder(sessionId, id) {
+  initSession(sessionId);
+  sessions[sessionId].pendingOrders = sessions[sessionId].pendingOrders.filter(
+    (p) => p.id !== id
+  );
 }
 
 // 🛒 장바구니 관련 함수
@@ -102,7 +112,8 @@ module.exports = {
   getLastFilters,
   clearSession,
   getAllSessions,
-  setPendingOrder,
+  addPendingOrder,
+  updatePendingOrder,
+  removePendingOrder,
   getPendingOrder,
-  clearPendingOrder,
 };

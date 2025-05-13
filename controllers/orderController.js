@@ -54,11 +54,8 @@ exports.handleOrder = async (req, res) => {
         const fixedOptions = {};
         const requiredOptions = [];
 
-        console.log("menu.options => ", menu.options);
-
         for (const key of Object.keys(options._doc || {})) {
           const values = options[key];
-
           if (!Array.isArray(values) || values.length === 0) continue;
 
           if (values.length === 1) {
@@ -89,9 +86,10 @@ exports.handleOrder = async (req, res) => {
         if (missing.length > 0) {
           console.log("[DEBUG] 옵션 누락 감지됨, pendingOrder로 이동");
 
-          cache.setPendingOrder(sessionId, {
-            currentAction: "order.add",
-            pendingItem: item,
+          const pendingId = uuidv4();
+          cache.addPendingOrder(sessionId, {
+            id: pendingId,
+            item,
             needOptions: missing,
             allOptions: options,
           });
@@ -104,6 +102,7 @@ exports.handleOrder = async (req, res) => {
             item: { name: item.name },
             needOptions: missing,
             options,
+            id: pendingId,
           });
         }
 
@@ -114,7 +113,6 @@ exports.handleOrder = async (req, res) => {
 
         cache.addToCart(sessionId, item);
         addedItems.push(item);
-        cache.clearPendingOrder(sessionId);
       }
 
       return res.json({
@@ -129,27 +127,25 @@ exports.handleOrder = async (req, res) => {
     if (actionType === "update") {
       const item = payload.item || {};
       const changes = payload.changes || {};
-      const pending = cache.getPendingOrder(sessionId);
+      const pendingId = payload.id;
+      const pendingOrders = cache.getPendingOrder(sessionId);
+      const pending = pendingOrders.find((p) => p.id === pendingId);
 
       console.log("[DEBUG] pendingOrder 상태:", pending);
 
-      if (pending?.currentAction === "order.add" && pending?.pendingItem) {
-        console.log("[DEBUG] 옵션 추가 흐름 진입");
-
-        const updatedItem = { ...pending.pendingItem, ...item, ...changes };
+      if (pending) {
+        const updatedItem = { ...pending.item, ...item, ...changes };
         const stillMissing = pending.needOptions.filter(
           (opt) => !updatedItem[opt]
         );
-
         if (stillMissing.length === 0) {
-          // option이 모두 채워진 경우 -> selectedOptions 구성 후 장바구니에 추가
           updatedItem.selectedOptions = {};
           for (const opt of pending.needOptions) {
             updatedItem.selectedOptions[opt] = updatedItem[opt];
           }
 
           cache.addToCart(sessionId, updatedItem);
-          cache.clearPendingOrder(sessionId);
+          cache.removePendingOrder(sessionId, pendingId);
 
           return res.json({
             response: "query.order.add",
@@ -159,15 +155,15 @@ exports.handleOrder = async (req, res) => {
             items: [updatedItem],
           });
         } else {
-          // 옵션 선택이 완료되지 않은 경우 -> 다시 pending에 저장
-          cache.setPendingOrder(sessionId, {
+          cache.updatePendingOrder(sessionId, pendingId, {
             ...pending,
-            pendingItem: updatedItem,
+            item: updatedItem,
             needOptions: stillMissing,
           });
 
           return res.json({
-            response: "query.order.add".sessionId,
+            response: "query.order.add",
+            sessionId,
             speech: `${updatedItem.name}의 ${stillMissing.join(
               "와 "
             )}를 더 선택해주세요`,
@@ -175,6 +171,7 @@ exports.handleOrder = async (req, res) => {
             item: { name: updatedItem.name },
             needOptions: stillMissing,
             options: pending.allOptions,
+            id: pendingId,
           });
         }
       }
