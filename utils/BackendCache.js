@@ -8,6 +8,7 @@ function initSession(sessionId) {
       cart: [],
       filters: {},
       recommended: {},
+      pendingOrder: null,
     };
   }
 }
@@ -20,6 +21,20 @@ function ensureSession(req) {
   }
   initSession(sessionId);
   return sessionId;
+}
+
+function setPendingOrder(sessionId, data) {
+  initSession(sessionId);
+  sessions[sessionId].pendingOrder = data;
+}
+function getPendingOrder(sessionId) {
+  initSession(sessionId);
+  return sessions[sessionId].pendingOrder;
+}
+
+function clearPendingOrder(sessionId) {
+  initSession(sessionId);
+  sessions[sessionId].pendingOrder = null;
 }
 
 // 🛒 장바구니 관련 함수
@@ -42,7 +57,7 @@ function setCart(sessionId, cartItems) {
 function addRecommendations(sessionId, filters, items) {
   initSession(sessionId);
   const key = JSON.stringify(filters);
-  const newIds = items.map(item => item.id);
+  const newIds = items.map((item) => item.id);
   const existingIds = sessions[sessionId].recommended[key] || [];
 
   // 중복 없이 누적
