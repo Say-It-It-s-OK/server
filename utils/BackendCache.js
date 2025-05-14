@@ -1,6 +1,6 @@
-// 메모리 기반 세션 캐시 저장소
+// utils/BackendCache.js
 const { v4: uuidv4 } = require("uuid");
-const { init } = require("../models/menu");
+
 const sessions = {};
 
 function initSession(sessionId) {
@@ -10,6 +10,7 @@ function initSession(sessionId) {
       filters: {},
       recommended: {},
       pendingOrders: [],
+      pendingOrder: null,
     };
   }
 }
@@ -24,9 +25,29 @@ function ensureSession(req) {
   return sessionId;
 }
 
+// ✅ 옵션 입력 대기 상태 관리
+function setPendingOrder(sessionId, pendingData) {
+  initSession(sessionId);
+  sessions[sessionId].pendingOrder = pendingData;
+  sessions[sessionId].pendingOrders = [pendingData]; // 하나만 유지
+}
+
+function getPendingOrderSingle(sessionId) {
+  initSession(sessionId);
+  return sessions[sessionId].pendingOrder;
+}
+
+function clearPendingOrder(sessionId) {
+  initSession(sessionId);
+  sessions[sessionId].pendingOrder = null;
+  sessions[sessionId].pendingOrders = [];
+}
+
+// ✅ 여러 개 저장되는 pendingOrders 리스트
 function addPendingOrder(sessionId, pendingData) {
   initSession(sessionId);
   sessions[sessionId].pendingOrders.push(pendingData);
+  sessions[sessionId].pendingOrder = pendingData; // 동기화
 }
 
 function getPendingOrder(sessionId) {
@@ -38,6 +59,9 @@ function updatePendingOrder(sessionId, id, updatedData) {
   initSession(sessionId);
   const idx = sessions[sessionId].pendingOrders.findIndex((p) => p.id === id);
   if (idx !== -1) sessions[sessionId].pendingOrders[idx] = updatedData;
+  if (sessions[sessionId].pendingOrder?.id === id) {
+    sessions[sessionId].pendingOrder = updatedData;
+  }
 }
 
 function removePendingOrder(sessionId, id) {
@@ -45,6 +69,9 @@ function removePendingOrder(sessionId, id) {
   sessions[sessionId].pendingOrders = sessions[sessionId].pendingOrders.filter(
     (p) => p.id !== id
   );
+  if (sessions[sessionId].pendingOrder?.id === id) {
+    sessions[sessionId].pendingOrder = null;
+  }
 }
 
 // 🛒 장바구니 관련 함수
@@ -63,6 +90,31 @@ function setCart(sessionId, cartItems) {
   sessions[sessionId].cart = cartItems;
 }
 
+function updateCartItem(sessionId, index, changes) {
+  initSession(sessionId);
+  const cart = sessions[sessionId].cart;
+  if (!cart[index]) return;
+
+  const target = cart[index];
+
+  // 필수: selectedOptions 객체 초기화
+  if (!target.selectedOptions) {
+    target.selectedOptions = {};
+  }
+
+  // 변경된 옵션만 반영 (selectedOptions 키는 따로)
+  for (const key of Object.keys(changes)) {
+    if (["온도", "크기", "샷"].includes(key)) {
+      target.selectedOptions[key] = changes[key];
+    } else {
+      target[key] = changes[key]; // 일반 속성 (예: name, count 등)
+    }
+  }
+
+  cart[index] = target;
+  sessions[sessionId].cart = cart;
+}
+
 // 🧠 추천 관련 캐시
 function addRecommendations(sessionId, filters, items) {
   initSession(sessionId);
@@ -70,11 +122,10 @@ function addRecommendations(sessionId, filters, items) {
   const newIds = items.map((item) => item.id);
   const existingIds = sessions[sessionId].recommended[key] || [];
 
-  // 중복 없이 누적
   const merged = [...new Set([...existingIds, ...newIds])];
   sessions[sessionId].recommended[key] = merged;
 
-  sessions[sessionId].filters = filters; // 최신 조건 저장
+  sessions[sessionId].filters = filters;
 
   console.log(`[추천 캐시 저장] 세션: ${sessionId}`);
   console.log(`- 조건: ${key}`);
@@ -96,7 +147,6 @@ function clearSession(sessionId) {
   delete sessions[sessionId];
 }
 
-// 디버깅용 전체 상태 조회
 function getAllSessions() {
   return sessions;
 }
@@ -107,6 +157,7 @@ module.exports = {
   addToCart,
   getCart,
   setCart,
+  updateCartItem,
   addRecommendations,
   getRecommendedIds,
   getLastFilters,
@@ -116,4 +167,7 @@ module.exports = {
   updatePendingOrder,
   removePendingOrder,
   getPendingOrder,
+  setPendingOrder,
+  getPendingOrderSingle,
+  clearPendingOrder,
 };

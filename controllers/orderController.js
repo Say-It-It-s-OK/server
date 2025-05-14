@@ -1,99 +1,103 @@
-// controllers/orderController.js
-const menu = require("../models/menu");
 const Menu = require("../models/menu");
 const Order = require("../models/orders");
 const cache = require("../utils/BackendCache");
 const sessionHelper = require("../utils/sessionHelper");
 const { v4: uuidv4 } = require("uuid");
 
+const keyMap = {
+  temperature: "온도",
+  size: "크기",
+  shot: "샷",
+  shot_add: "샷 추가",
+};
+
+const mapKeys = (obj) => {
+  if (!obj) return;
+  for (const k in obj) {
+    const mapped = keyMap[k];
+    if (mapped) {
+      obj[mapped] = obj[k];
+      delete obj[k];
+    }
+  }
+};
+
+const finalizeItem = async (rawItem) => {
+  const menu = await Menu.findOne({ name: rawItem.name });
+  if (!menu) return null;
+
+  const options = menu.options || {};
+  const selectedOptions = {};
+
+  ["온도", "크기", "샷"].forEach((key) => {
+    if (rawItem[key]) {
+      selectedOptions[key] = rawItem[key];
+      delete rawItem[key];
+    }
+  });
+
+  if ((menu.type === "커피" || menu.type === "디카페인") && !selectedOptions["샷"] && options["샷"]?.length) {
+    selectedOptions["샷"] = "보통";
+  }
+
+  return {
+    ...rawItem,
+    selectedOptions,
+    options,
+    ingredient: menu.ingredient,
+    tag: menu.tag,
+    id: menu.id,
+    caffeine: menu.caffeine,
+    price: menu.price,
+    _id: menu._id,
+  };
+};
+
 exports.handleOrder = async (req, res) => {
   const sessionId = sessionHelper.ensureSession(req);
   const { request, payload } = req.body;
-  const actionType = request.split(".")[2]; // add, update, delete, pay
+  const actionType = request.split(".")[2];
+
+  mapKeys(payload.item);
+  mapKeys(payload.changes);
 
   try {
     if (actionType === "add") {
       const items = Array.isArray(payload.item) ? payload.item : [payload.item];
       const addedItems = [];
-      const required_option_keys = ["온도", "크기"];
-      // const missingOptionItems = [];
-
-      // const drinkTypes = ["coffee", "decaffeine", "drink"];
-
-      // const typeMap = {
-      //   커피: "coffee",
-      //   디카페인: "decaffeine",
-      //   음료: "drink",
-      //   디저트: "dessert",
-      // };
 
       for (const item of items) {
         if (!item || !item.name) continue;
 
-        // item.type = typeMap[item.type] || item.type;
-
-        // // 가격이 없다면 DB에서 메뉴 정보 조회
-        // if (!item.price || !item.type || !drinkTypes.includes(item.type)) {
         const menu = await Menu.findOne({ name: item.name });
-        if (!menu) {
-          console.warn(`[WARN] ${item.name} 메뉴를 찾을 수 없습니다.`);
-          continue;
-        }
-
-        if (!item.price) item.price = menu.price;
-        item.type = menu.type;
-
-        // 디저트는 옵션 없이 바로 추가
-        if (menu.type === "디저트") {
-          item.selectedOptions = {};
-          cache.addToCart(sessionId, item);
-          addedItems.push(item);
-          continue;
-        }
+        if (!menu) continue;
 
         const options = menu.options || {};
-        const fixedOptions = {};
         const requiredOptions = [];
 
-        for (const key of Object.keys(options._doc || {})) {
-          const values = options[key];
-          if (!Array.isArray(values) || values.length === 0) continue;
-
-          if (values.length === 1) {
-            fixedOptions[key] = values[0];
+        if (menu.type === "커피" || menu.type === "디카페인") {
+          requiredOptions.push("온도", "크기");
+        } else if (menu.type === "음료") {
+          if (Array.isArray(options["온도"]) && options["온도"].length === 1) {
+            if (!item["온도"]) item["온도"] = options["온도"][0];
+            requiredOptions.push("크기");
+          } else {
+            requiredOptions.push("온도", "크기");
           }
-
-          if (required_option_keys.includes(key)) {
-            requiredOptions.push(key);
-          }
-          console.log(
-            "[DEBUG] 현재 key:",
-            key,
-            "| isRequired:",
-            required_option_keys.includes(key)
-          );
-        }
-
-        for (const key of Object.keys(fixedOptions)) {
-          item[key] = fixedOptions[key];
         }
 
         const missing = requiredOptions.filter((opt) => !item[opt]);
 
-        console.log("[DEBUG] 메뉴 옵션:", options);
-        console.log("[DEBUG] 필수 옵션:", requiredOptions);
-        console.log("[DEBUG] 누락된 옵션:", missing);
-
         if (missing.length > 0) {
-          console.log("[DEBUG] 옵션 누락 감지됨, pendingOrder로 이동");
-
           const pendingId = uuidv4();
-          cache.addPendingOrder(sessionId, {
-            id: pendingId,
-            item,
+          cache.setPendingOrder(sessionId, {
+            currentAction: "order.add",
+            pendingItem: item,
             needOptions: missing,
             allOptions: options,
           });
+
+          console.log(pendingId)
 
           return res.json({
             response: request,
@@ -103,17 +107,13 @@ exports.handleOrder = async (req, res) => {
             item: { name: item.name },
             needOptions: missing,
             options,
-            id: pendingId,
+            pendingid: pendingId,
           });
         }
 
-        item.selectedOptions = {};
-        for (const key of requiredOptions) {
-          item.selectedOptions[key] = item[key];
-        }
-
-        cache.addToCart(sessionId, item);
-        addedItems.push(item);
+        const finalizedItem = await finalizeItem(item);
+        cache.addToCart(sessionId, finalizedItem);
+        addedItems.push(finalizedItem);
       }
 
       return res.json({
@@ -125,65 +125,73 @@ exports.handleOrder = async (req, res) => {
       });
     }
 
+    // update
     if (actionType === "update") {
       const item = payload.item || {};
       const changes = payload.changes || {};
       const pendingId = payload.id;
+      
       const pendingOrders = cache.getPendingOrder(sessionId);
-      const pending = pendingOrders.find((p) => p.id === pendingId);
+      let pending;
 
-      console.log("[DEBUG] pendingOrder 상태:", pending);
+      // pendingId 있을 때 id로 찾기
+      if (pendingId) {
+        pending = pendingOrders.find((p) => p.id === pendingId);
+      }
+
+      // pendingId 없을 때는 최근 pending 하나를 가져옴
+      if (!pending && pendingOrders && pendingOrders.length > 0) {
+        pending = pendingOrders[pendingOrders.length - 1]; 
+      }
 
       if (pending) {
-        const updatedItem = { ...pending.item, ...item, ...changes };
-        const stillMissing = pending.needOptions.filter(
-          (opt) => !updatedItem[opt]
-        );
-        if (stillMissing.length === 0) {
-          updatedItem.selectedOptions = {};
-          for (const opt of pending.needOptions) {
-            updatedItem.selectedOptions[opt] = updatedItem[opt];
-          }
+        const updatedItem = { ...pending.pendingItem, ...item, ...changes };
+        const stillMissing = pending.needOptions.filter((opt) => !updatedItem[opt]);
 
-          cache.addToCart(sessionId, updatedItem);
-          cache.removePendingOrder(sessionId, pendingId);
+        console.log("[DEBUG] pending 데이터 업데이트 중", {
+          updatedItem,
+          stillMissing,
+          pending,
+        });
+
+        if (stillMissing.length === 0) {
+          const finalizedItem = await finalizeItem(updatedItem);
+          cache.addToCart(sessionId, finalizedItem);
+          cache.removePendingOrder(sessionId, pending.id);
+          cache.clearPendingOrder(sessionId);
 
           return res.json({
             response: "query.order.add",
             sessionId,
-            speech: `${updatedItem.name}를 장바구니에 추가했어요`,
+            speech: `${finalizedItem.name}를 장바구니에 추가했어요.`,
             page: "order_add",
-            items: [updatedItem],
+            items: [finalizedItem],
           });
         } else {
-          cache.updatePendingOrder(sessionId, pendingId, {
+          cache.updatePendingOrder(sessionId, pending.id, {
             ...pending,
-            item: updatedItem,
+            pendingItem: updatedItem,
             needOptions: stillMissing,
           });
 
           return res.json({
             response: "query.order.add",
             sessionId,
-            speech: `${updatedItem.name}의 ${stillMissing.join(
-              "와 "
-            )}를 더 선택해주세요`,
+            speech: `${updatedItem.name}의 ${stillMissing.join("와 ")}를 더 선택해주세요.`,
             page: "order_option_required",
             item: { name: updatedItem.name },
             needOptions: stillMissing,
             options: pending.allOptions,
-            id: pendingId,
+            id: pending.id,
           });
         }
       }
 
-      // 기존 장바구니 항목 수정 로직
+
+      // cart 수정 블록
       const cart = cache.getCart(sessionId);
       const name = item.name || changes.name;
       let targetIndex = -1;
-
-      console.log("[DEBUG] 기존 장바구니:", cart);
-      console.log("[DEBUG] 업데이트 요청 항목 (changes):", changes);
 
       if (name) {
         targetIndex = cart.findIndex((c) => c.name === name);
@@ -192,24 +200,41 @@ exports.handleOrder = async (req, res) => {
       }
 
       if (targetIndex === -1) {
+        console.warn("[WARN] 수정할 항목 없음", { sessionId, item, changes, cart });
         return res.status(400).json({
           error: "수정할 항목을 찾을 수 없습니다. 이름을 명시해주세요.",
         });
       }
 
-      const updatedItem = { ...cart[targetIndex], ...item, ...changes };
-      cart[targetIndex] = updatedItem;
-      cache.setCart(sessionId, cart);
+      for (const k in item) {
+        const mapped = keyMap[k];
+        if (mapped) {
+          item[mapped] = item[k];
+          delete item[k];
+        }
+      }
+      
+      for (const k in changes) {
+        const mapped = keyMap[k];
+        if (mapped) {
+          changes[mapped] = changes[k];
+          delete changes[k];
+        }
+      }
 
-      console.log("[DEBUG] 수정 후 장바구니:", cache.getCart(sessionId));
+      // ✅ item + changes 병합 후 update
+      const mergedChanges = { ...item, ...changes };
+      console.log("[DEBUG] apply mergedChanges to cart:", mergedChanges);
+      cache.updateCartItem(sessionId, targetIndex, mergedChanges);
 
       return res.json({
         response: request,
-        speech: `${updatedItem.name}의 옵션을 수정했어요.`,
+        speech: `${cart[targetIndex].name}의 옵션을 수정했어요.`,
         sessionId,
-        page: "order_update",
-      });
+        page: "order_update"
+      });    
     }
+
 
     if (actionType === "delete") {
       const item = payload.item;
@@ -240,6 +265,7 @@ exports.handleOrder = async (req, res) => {
     }
 
     return res.status(400).json({ error: "지원하지 않는 order 타입입니다." });
+
   } catch (err) {
     console.error("order 처리 오류:", err);
     return res.status(500).json({ error: "주문 처리 중 오류가 발생했습니다." });
