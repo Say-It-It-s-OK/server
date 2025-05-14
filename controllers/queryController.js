@@ -15,7 +15,6 @@ exports.handleConfirm = async (req, res) => {
     dessert: "디저트",
   };
 
-
   try {
     if (target === "menu") {
       // 카테고리별 메뉴 확인
@@ -30,7 +29,6 @@ exports.handleConfirm = async (req, res) => {
         page: pageValue,
         items: result,
       });
-
     } else if (target === "cart") {
       const cart = cache.getCart(sessionId);
       console.log("[DEBUG] 세션 ID:", sessionId);
@@ -43,20 +41,24 @@ exports.handleConfirm = async (req, res) => {
         sessionId,
         items: cart || [],
       });
-
     } else if (target === "order") {
       const cart = cache.getCart(sessionId);
-      const matchCategories = categories.map(c => typeMap[c] || c);
+      const matchCategories = categories.map((c) => typeMap[c] || c);
 
-      const filtered = cart?.filter(menu => {
-        const matchName = !item.name || menu.name === item.name;
-        const matchTemp = !item.temperature || menu.temperature === item.temperature;
-        const matchSize = !item.size || menu.size === item.size;
-        const matchShot = !item.shot || menu.shot === item.shot;
-        const matchCategory = matchCategories.length === 0 || matchCategories.includes(menu.type);
+      const filtered =
+        cart?.filter((menu) => {
+          const matchName = !item.name || menu.name === item.name;
+          const matchTemp =
+            !item.temperature || menu.temperature === item.temperature;
+          const matchSize = !item.size || menu.size === item.size;
+          const matchShot = !item.shot || menu.shot === item.shot;
+          const matchCategory =
+            matchCategories.length === 0 || matchCategories.includes(menu.type);
 
-        return matchName && matchTemp && matchSize && matchShot && matchCategory;
-      }) || [];
+          return (
+            matchName && matchTemp && matchSize && matchShot && matchCategory
+          );
+        }) || [];
 
       return res.json({
         response: request,
@@ -65,11 +67,13 @@ exports.handleConfirm = async (req, res) => {
         sessionId,
         items: filtered,
       });
-
     } else if (target === "price") {
       const cart = cache.getCart(sessionId) || [];
 
-      const totalPrice = cart.reduce((acc, item) => acc + (item.price || 0) * (item.count || 1), 0);
+      const totalPrice = cart.reduce(
+        (acc, item) => acc + (item.price || 0) * (item.count || 1),
+        0
+      );
 
       return res.json({
         response: request,
@@ -78,7 +82,6 @@ exports.handleConfirm = async (req, res) => {
         sessionId,
         total: totalPrice,
       });
-
     } else {
       return res.status(400).json({ error: "지원하지 않는 target입니다." });
     }
