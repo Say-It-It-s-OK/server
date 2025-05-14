@@ -40,7 +40,7 @@ const menuSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
-    decaffein : {
+    caffeine : {
       type: String
     },
     tag : {
