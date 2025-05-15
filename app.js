@@ -3,11 +3,14 @@ const cors = require("cors");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger/swagger");
 
+
 const menusRouter = require("./routes/menus");
 const queryRoutes = require('./routes/query');
 const orderRoutes = require("./routes/order");
 const recommendRoutes = require('./routes/recommend');
 const nlpRoutes = require('./routes/nlp');  // ✅ 추가된 라우터
+const cartRouter = require("./routes/cart");
+
 
 require("./db");
 
@@ -31,6 +34,7 @@ app.use("/query", queryRoutes);
 app.use("/recommend", recommendRoutes);
 app.use("/order", orderRoutes);
 app.use("/api", nlpRoutes);           // ✅ NLP 라우터 연결
+app.use("/cart", cartRouter);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // 서버 실행
