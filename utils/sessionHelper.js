@@ -1,7 +1,13 @@
+// controllers/sessionHelper.js
 const { v4: uuidv4 } = require("uuid");
 const cache = require("./BackendCache");
 
+// In-memory session store (for testing/local use)
+const sessionStore = {}; // sessionId -> sessionData
+
 function ensureSession(req) {
+  console.log("[ensureSession] req.body:", req.body);  // 여기 찍어보자
+
   let sessionId = req.body.sessionId;
 
   if (!sessionId) {
@@ -16,6 +22,16 @@ function ensureSession(req) {
   return sessionId;
 }
 
+async function getSession(sessionId) {
+  return sessionStore[sessionId] || {};
+}
+
+async function saveSession(sessionId, sessionData) {
+  sessionStore[sessionId] = sessionData;
+}
+
 module.exports = {
   ensureSession,
+  getSession,
+  saveSession
 };
