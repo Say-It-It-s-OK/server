@@ -243,9 +243,6 @@ exports.handleOrder = async (req, res) => {
     const cart = cache.getCart(sessionId);
     const now = new Date();
     const orderId = "ORD" + now.toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
-    if (cache.isPaid(sessionId)) {
-      return res.status(400).json({ error: "이미 결제된 세션입니다." });
-    }
 
     // ✅ 메뉴별로 그룹핑 후 수량 계산
     const itemMap = new Map();
@@ -281,7 +278,6 @@ exports.handleOrder = async (req, res) => {
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    cache.markAsPaid(sessionId);
     cache.clearSession(sessionId);
 
     return res.json({
