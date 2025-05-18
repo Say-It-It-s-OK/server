@@ -1,4 +1,5 @@
 const cache = require("../utils/BackendCache");
+const Order = require("../models/orders"); 
 
 // ✅ 장바구니 추가
 exports.add = (req, res) => {
@@ -102,16 +103,46 @@ exports.fetch = (req, res) => {
 };
 
 // ✅ 결제 처리
-exports.pay = (req, res) => {
+exports.pay = async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) {
     return res.status(400).json({ error: "sessionId가 없습니다." });
   }
 
   const cart = cache.getCart(sessionId);
-  const total = cart.reduce((sum, i) => sum + i.price * (i.count || 1), 0);
+  const now = new Date();
+  const orderId = "ORD" + now.toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
 
-  console.log("[CART] PAY:", { sessionId, total });
+  // 메뉴별로 그룹핑 후 수량 계산
+  const itemMap = new Map();
+
+  for (const item of cart) {
+    const key = item.id;
+    if (!itemMap.has(key)) {
+      itemMap.set(key, { ...item, quantity: 1 });
+    } else {
+      itemMap.get(key).quantity += 1;
+    }
+  }
+
+  // DB 저장 + 로그 출력
+  for (const [, item] of itemMap) {
+    console.log("[CART → DB 저장]", {
+      order_id: orderId,
+      order_date: now,
+      menu_id: item.id,
+      quantity: item.quantity,
+    });
+
+    await Order.create({
+      order_id: orderId,
+      order_date: now,
+      menu_id: item.id,
+      quantity: item.quantity,
+    });
+  }
+
+  const total = cart.reduce((sum, i) => sum + i.price, 0);
 
   cache.clearSession(sessionId);
 
