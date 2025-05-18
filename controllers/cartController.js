@@ -109,7 +109,7 @@ exports.pay = async (req, res) => {
     return res.status(400).json({ error: "sessionId가 없습니다." });
   }
 
-  const cart = cache.getCart(sessionId);
+  const cart = cache.getCart(sessionId.sessionId);
   const now = new Date();
   const orderId = "ORD" + now.toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
 
@@ -144,7 +144,7 @@ exports.pay = async (req, res) => {
 
   const total = cart.reduce((sum, i) => sum + i.price, 0);
 
-  cache.clearSession(sessionId);
+  cache.clearSession(sessionId.sessionId);
 
   return res.json({
     response: "cart.pay",
