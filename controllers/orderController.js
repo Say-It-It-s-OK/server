@@ -132,6 +132,7 @@ const handleNextItem = async (sessionId, request, res) => {
 
   const finalizedItem = await finalizeItem(item);
   cache.addToCart(sessionId, finalizedItem);
+  console.log("[CART] ADD:", { sessionId, item: finalizedItem });
   session.itemQueue.shift();
   await sessionHelper.saveSession(sessionId, session);
   return handleNextItem(sessionId, request, res);
@@ -242,6 +243,9 @@ exports.handleOrder = async (req, res) => {
     const cart = cache.getCart(sessionId);
     const now = new Date();
     const orderId = "ORD" + now.toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
+    if (cache.isPaid(sessionId)) {
+      return res.status(400).json({ error: "이미 결제된 세션입니다." });
+    }
 
     // ✅ 메뉴별로 그룹핑 후 수량 계산
     const itemMap = new Map();
@@ -272,7 +276,12 @@ exports.handleOrder = async (req, res) => {
       });
     }
 
-    const total = cart.reduce((sum, i) => sum + i.price * (i.count || 1), 0);
+    // ✅ 총액 계산: price × quantity 반영
+    const total = [...itemMap.values()].reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    cache.markAsPaid(sessionId);
     cache.clearSession(sessionId);
 
     return res.json({
