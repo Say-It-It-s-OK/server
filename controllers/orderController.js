@@ -130,18 +130,17 @@ const handleNextItem = async (sessionId, request, res) => {
   const session = await sessionHelper.getSession(sessionId);
   const queue = session.itemQueue || [];
 
-  if (queue.length === 0) {
-    const cart = cache.getCart(sessionId);
-    const names = cart.map(item => item.name);
-    const counted = {};
+    if (queue.length === 0) {
+      const names = addedItems.map(item => item.name);
+      const counted = {};
 
-    names.forEach(name => {
-      counted[name] = (counted[name] || 0) + 1;
-    });
+      names.forEach(name => {
+        counted[name] = (counted[name] || 0) + 1;
+      });
 
-    const nameList = Object.entries(counted)
-      .map(([name, count]) => `${name}${count > 1 ? ` ${count}개` : ""}`)
-      .join(", ");
+      const nameList = Object.entries(counted)
+        .map(([name, count]) => `${name}${count > 1 ? ` ${count}개` : ""}`)
+        .join(", ");
 
     console.log("[handleNextItem] 모든 항목 처리 완료 → order_add 응답");
     return res.json({
