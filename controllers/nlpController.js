@@ -92,12 +92,7 @@ exports.handleNLPRequest = async (req, res) => {
       }
 
       if (action === "confirm") {
-        console.log("[CART] FETCH:", {
-          sessionId,
-          cart: cache.getCart(sessionId),
-        });
         return queryController.handleConfirm(req, res, payload);
-        
       }
 
       if (action === "help") {
