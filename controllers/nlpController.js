@@ -6,25 +6,85 @@ const sessionHelper = require("../utils/sessionHelper");
 
 exports.handleNLPRequest = async (req, res) => {
   const { request, payload } = req.body;
-  const [group, action, subaction] = request.split(".");
   const sessionId = sessionHelper.ensureSession(req);
-
   console.log("[NLP 요청 수신]", request, payload);
 
   try {
-    // query 그룹
+    if (request === "query.sequence") {
+      const { intents = [], filters = {}, items = [], categories = [], target, action } = payload;
+      const results = [];
+
+      const createTempRes = () => {
+        const tempRes = {};
+        tempRes.json = (result) => {
+          results.push(result);
+        };
+        return tempRes;
+      };
+
+      for (const intent of intents) {
+        const tempRes = createTempRes();
+        req.body.request = `query.${intent}`;
+        req.body.sessionId = sessionId;
+
+        if (intent === "order.update") {
+          req.body.payload = { filters, items, categories, target, action };
+          await orderController.handleOrder(req, tempRes);
+        } else {
+          req.body = {
+            request: `query.${intent}`,
+            payload: { filters, items, categories, target, action },
+            sessionId,
+          };
+
+          if (intent.startsWith("recommend")) {
+            await recommendController.handleRecommend(req, tempRes, req.body.payload);
+          } else if (intent.startsWith("order.")) {
+            await orderController.handleOrder(req, tempRes);
+          } else if (intent === "confirm") {
+            await queryController.handleConfirm(req, tempRes);
+          } else if (intent === "help") {
+            results.push({
+              response: "query.help",
+              speech: "키오스크 사용법을 알려드릴게요. 메뉴를 말하면 추천이나 주문을 도와드려요!",
+              page: "help",
+            });
+          } else if (intent === "exit") {
+            cache.clearSession(sessionId);
+            results.push({
+              response: "query.exit",
+              speech: "주문을 종료할게요. 감사합니다!",
+              page: "exit",
+            });
+          } else if (intent === "error") {
+            results.push({
+              response: "query.error",
+              speech: "죄송해요. 무슨 말인지 잘 이해하지 못했어요.",
+              page: "error",
+            });
+          } else {
+            results.push({ error: `알 수 없는 intent: ${intent}` });
+          }
+        }
+      }
+
+      return res.json({
+        response: "query.sequence",
+        sessionId,
+        results,
+      });
+    }
+
+    // ✅ 단일 intent 처리
+    const [group, action, subaction] = request.split(".");
+
     if (group === "query") {
       if (action === "recommend") {
         return recommendController.handleRecommend(req, res, payload);
       }
 
       if (action === "confirm") {
-        console.log("[CART] FETCH:", {
-          sessionId,
-          cart: cache.getCart(sessionId),
-        });
         return queryController.handleConfirm(req, res, payload);
-        
       }
 
       if (action === "help") {
@@ -87,7 +147,6 @@ exports.handleNLPRequest = async (req, res) => {
         });
       }
 
-      // 예외적으로 query.order.add 등 처리 허용
       if (request.startsWith("query.order.")) {
         return orderController.handleOrder(req, res);
       }
