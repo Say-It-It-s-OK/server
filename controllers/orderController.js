@@ -117,12 +117,14 @@ const finalizeItem = async (rawItem) => {
         id: pendingId
       });
 
+      const finalizedInfo = await finalizeItem(item); // menu DB에서 정보 불러오기
+
       return res.json({
         response: request,
         sessionId,
         page: "order_option_required",
         speech: `${item.name}의 ${missing.join("와 ")}을(를) 선택해주세요.`,
-        item: { name: item.name },
+        item: finalizedInfo,
         needOptions: missing,
         options,
         pendingid: pendingId
