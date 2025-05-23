@@ -217,12 +217,14 @@ exports.handleOrder = async (req, res) => {
             needOptions: stillMissing,
           });
 
+          const finalizedInfo = await finalizeItem(updatedItem); // menu DB에서 정보 불러오기
+
           return res.json({
             response: "query.order.add",
             sessionId,
             speech: `${updatedItem.name}의 ${stillMissing.join("와 ")}를 더 선택해주세요.`,
             page: "order_option_required",
-            item: { name: updatedItem.name },
+            item: finalizedInfo,
             needOptions: stillMissing,
             options: pending.allOptions,
             id: pending.id,
