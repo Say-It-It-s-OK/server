@@ -11,15 +11,23 @@ exports.handleNLPRequest = async (req, res) => {
 
   try {
     if (request === "query.sequence") {
-      const { intents = [], filters = {}, items = [], categories = [], target, action } = payload;
+      const {
+        intents = [],
+        filters = {},
+        items = [],
+        categories = [],
+        target,
+        action
+      } = payload;
+
       const results = [];
 
       const createTempRes = () => {
         const tempRes = {};
         tempRes.json = (result) => {
-          // ✅ 여기서 중첩된 query.sequence 응답을 처리
+          // ✅ 중첩된 query.sequence 응답이면 내부 results만 flatten
           if (result?.response === "query.sequence" && Array.isArray(result.results)) {
-            results.push(...result.results); // ✅ 내부 결과만 push
+            results.push(...result.results);
           } else {
             results.push(result);
           }
@@ -29,48 +37,42 @@ exports.handleNLPRequest = async (req, res) => {
 
       for (const intent of intents) {
         const tempRes = createTempRes();
-        req.body.request = `query.${intent}`;
-        req.body.sessionId = sessionId;
-        req.body.payload = { filters, items, categories, target, action };
 
+        req.body = {
+          request: `query.${intent}`,
+          payload: { filters, items, categories, target, action },
+          sessionId
+        };
 
         if (intent === "order.update") {
           await orderController.handleOrder(req, tempRes);
+        } else if (intent.startsWith("recommend")) {
+          await recommendController.handleRecommend(req, tempRes, req.body.payload);
+        } else if (intent.startsWith("order.")) {
+          await orderController.handleOrder(req, tempRes);
+        } else if (intent === "confirm") {
+          await queryController.handleConfirm(req, tempRes);
+        } else if (intent === "help") {
+          results.push({
+            response: "query.help",
+            speech: "키오스크 사용법을 알려드릴게요. 메뉴를 말하면 추천이나 주문을 도와드려요!",
+            page: "help",
+          });
+        } else if (intent === "exit") {
+          cache.clearSession(sessionId);
+          results.push({
+            response: "query.exit",
+            speech: "주문을 종료할게요. 감사합니다!",
+            page: "exit",
+          });
+        } else if (intent === "error") {
+          results.push({
+            response: "query.error",
+            speech: "죄송해요. 무슨 말인지 잘 이해하지 못했어요.",
+            page: "error",
+          });
         } else {
-          req.body = {
-            request: `query.${intent}`,
-            payload: { filters, items, categories, target, action },
-            sessionId,
-          };
-
-          if (intent.startsWith("recommend")) {
-            await recommendController.handleRecommend(req, tempRes, req.body.payload);
-          } else if (intent.startsWith("order.")) {
-            await orderController.handleOrder(req, tempRes);
-          } else if (intent === "confirm") {
-            await queryController.handleConfirm(req, tempRes);
-          } else if (intent === "help") {
-            results.push({
-              response: "query.help",
-              speech: "키오스크 사용법을 알려드릴게요. 메뉴를 말하면 추천이나 주문을 도와드려요!",
-              page: "help",
-            });
-          } else if (intent === "exit") {
-            cache.clearSession(sessionId);
-            results.push({
-              response: "query.exit",
-              speech: "주문을 종료할게요. 감사합니다!",
-              page: "exit",
-            });
-          } else if (intent === "error") {
-            results.push({
-              response: "query.error",
-              speech: "죄송해요. 무슨 말인지 잘 이해하지 못했어요.",
-              page: "error",
-            });
-          } else {
-            results.push({ error: `알 수 없는 intent: ${intent}` });
-          }
+          results.push({ error: `알 수 없는 intent: ${intent}` });
         }
       }
 
