@@ -176,39 +176,75 @@ exports.handleOrder = async (req, res) => {
   const actionType = request.split(".")[2];
 
   if (actionType === "add") {
-    const session = await sessionHelper.getSession(sessionId);
+    const items = payload.items || [];
+    const results = [];
 
-    // ✅ itemQueue 비어있다면 payload 기반으로 새로 넣기
-    if (!session.itemQueue || session.itemQueue.length === 0) {
-      if (payload.items && payload.items.length > 0) {
-        session.itemQueue = [...payload.items];
-        await sessionHelper.saveSession(sessionId, session);
-        console.log("[ORDER] itemQueue 새로 세팅:", session.itemQueue.map(i => i.name));
-      } else {
-        console.log("[ORDER] itemQueue 없음, 처리할 아이템 없음");
-        return res.json({
+    for (const item of items) {
+      const menu = await Menu.findOne({ name: item.name });
+      if (!menu) {
+        results.push({
           response: request,
-          sessionId,
-          speech: "모든 메뉴를 장바구니에 담았어요.",
+          speech: `${item.name}은(는) 존재하지 않는 메뉴입니다.`,
+          page: "order_error"
+        });
+        continue;
+      }
+
+      const options = menu.options || {};
+      mapKeys(item.options);
+
+      const required = [];
+      if (menu.type === "커피" || menu.type === "디카페인") {
+        required.push("온도", "크기");
+      } else if (menu.type === "음료") {
+        if (Array.isArray(options["온도"]) && options["온도"].length === 1) {
+          if (!item.options?.["온도"]) {
+            item.options["온도"] = options["온도"][0];
+          }
+          required.push("크기");
+        } else {
+          required.push("온도", "크기");
+        }
+      }
+
+      const missing = required.filter((key) => !item.options?.[key]);
+
+      if (missing.length > 0) {
+        const pendingId = uuidv4();
+        cache.setPendingOrder(sessionId, {
+          currentAction: "order.add",
+          pendingItem: item,
+          needOptions: missing,
+          allOptions: options,
+          id: pendingId
+        });
+
+        results.push({
+          response: request,
+          page: "order_option_required",
+          speech: `${item.name}의 ${missing.join("와 ")}을(를) 선택해주세요.`,
+          item: await finalizeItem(item),
+          needOptions: missing,
+          options,
+          pendingid: pendingId
+        });
+      } else {
+        const finalizedItem = await finalizeItem(item);
+        cache.addToCart(sessionId, finalizedItem);
+        results.push({
+          response: request,
           page: "order_add",
+          speech: `${item.name}을(를) 장바구니에 추가했어요.`,
+          items: [finalizedItem]
         });
       }
     }
 
-    const hasPending = (cache.getPendingOrder(sessionId) || []).length > 0;
-    console.log("[ORDER] pendingOrder 존재 여부:", hasPending);
-
-    if (hasPending) {
-      return res.json({
-        response: request,
-        sessionId,
-        speech: "이전 항목 처리가 완료되지 않았습니다.",
-        page: "order_wait"
-      });
-    }
-
-    // ✅ 다음 메뉴 처리
-    return handleNextItem(sessionId, request, res);
+    return res.json({
+      response: "query.sequence",
+      sessionId,
+      results
+    });
   }
   
   if (actionType === "update") {
