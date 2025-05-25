@@ -17,7 +17,12 @@ exports.handleNLPRequest = async (req, res) => {
       const createTempRes = () => {
         const tempRes = {};
         tempRes.json = (result) => {
-          results.push(result);
+          // ✅ 여기서 중첩된 query.sequence 응답을 처리
+          if (result?.response === "query.sequence" && Array.isArray(result.results)) {
+            results.push(...result.results); // ✅ 내부 결과만 push
+          } else {
+            results.push(result);
+          }
         };
         return tempRes;
       };
@@ -26,9 +31,10 @@ exports.handleNLPRequest = async (req, res) => {
         const tempRes = createTempRes();
         req.body.request = `query.${intent}`;
         req.body.sessionId = sessionId;
+        req.body.payload = { filters, items, categories, target, action };
+
 
         if (intent === "order.update") {
-          req.body.payload = { filters, items, categories, target, action };
           await orderController.handleOrder(req, tempRes);
         } else {
           req.body = {
