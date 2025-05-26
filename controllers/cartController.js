@@ -14,7 +14,7 @@ exports.add = (req, res) => {
   return res.json({
     response: "cart.add",
     sessionId,
-    speech: `${item.name}을(를) 장바구니에 추가했어요.`,
+    speech: `${item.name} 추가했어요.`,
     page: "order_add",
     items: [item],
   });
@@ -51,7 +51,7 @@ exports.update = (req, res) => {
   return res.json({
     response: "cart.update",
     sessionId,
-    speech: `${cart[cartIndex].name}의 옵션을 수정했어요.`,
+    speech: `${cart[cartIndex].name}, 말씀하신 대로 옵션 바꿨어요.`,
     page: "order_update",
     item: cart[cartIndex],
   });
@@ -78,7 +78,7 @@ exports.delete = (req, res) => {
   return res.json({
     response: "cart.delete",
     sessionId,
-    speech: `${deleted[0].name}을(를) 장바구니에서 삭제했어요.`,
+    speech: `${deleted[0].name}, 장바구니에서 빼드렸어요.`,
     page: "order_delete",
   });
 };
@@ -149,7 +149,7 @@ exports.pay = async (req, res) => {
   return res.json({
     response: "cart.pay",
     sessionId,
-    speech: `결제가 완료되었습니다. 총 ${total}원이에요.`,
+    speech: `총 ${total}원입니다. 감사합니다!`,
     page: "order_pay",
     total,
   });
