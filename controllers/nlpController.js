@@ -55,20 +55,20 @@ exports.handleNLPRequest = async (req, res) => {
         } else if (intent === "help") {
           results.push({
             response: "query.help",
-            speech: "키오스크 사용법을 알려드릴게요. 메뉴를 말하면 추천이나 주문을 도와드려요!",
+            speech: "메뉴를 말씀하시면 주문, 조건을 말씀하시면 추천해드려요. 결제나 장바구니 확인도 가능해요.",
             page: "help",
           });
         } else if (intent === "exit") {
           cache.clearSession(sessionId);
           results.push({
             response: "query.exit",
-            speech: "주문을 종료할게요. 감사합니다!",
+            speech: "주문 여기까지 진행할게요. 감사합니다!",
             page: "exit",
           });
         } else if (intent === "error") {
           results.push({
             response: "query.error",
-            speech: "죄송해요. 무슨 말인지 잘 이해하지 못했어요.",
+            speech: "그건 제가 도와드릴 수 없는 부분이에요. 주문하실 메뉴나 추천이 필요하시면 말씀해주세요.",
             page: "error",
           });
         } else {
@@ -98,7 +98,7 @@ exports.handleNLPRequest = async (req, res) => {
       if (action === "help") {
         return res.json({
           response: "query.help",
-          speech: "키오스크 사용법을 알려드릴게요. 메뉴를 말하면 추천이나 주문을 도와드려요!",
+          speech: "메뉴를 말씀하시면 주문, 조건을 말씀하시면 추천해드려요. 결제나 장바구니 확인도 가능해요.",
           page: "help",
         });
       }
@@ -111,13 +111,13 @@ exports.handleNLPRequest = async (req, res) => {
         if (subAction === "accept" || subAction === "reject") {
           return res.json({
             response: "query.error",
-            speech: "알겠습니다. 다른 요청을 말씀해주세요.",
+            speech: "그건 제가 도와드릴 수 없는 부분이에요. 주문하실 메뉴나 추천이 필요하시면 말씀해주세요.",
             page: "error",
           });
         }
         return res.json({
           response: "query.error",
-          speech: "죄송해요. 무슨 말인지 잘 이해하지 못했어요.",
+          speech: "그건 제가 도와드릴 수 없는 부분이에요. 주문하실 메뉴나 추천이 필요하시면 말씀해주세요.",
           page: "error",
         });
       }
@@ -131,14 +131,14 @@ exports.handleNLPRequest = async (req, res) => {
         if (replyAction === "accept") {
           return res.json({
             response: "query.reply",
-            speech: "좋아요! 선택하신 메뉴로 진행할게요.",
+            speech: "네, 그거로 준비해드릴게요.",
             page: "confirm",
           });
         }
         if (replyAction === "reject") {
           return res.json({
             response: "query.reply",
-            speech: "알겠습니다. 다른 메뉴를 추천해드릴게요.",
+            speech: "그럼 다른 메뉴 추천해볼게요",
             page: "recommend_retry",
           });
         }
@@ -150,7 +150,7 @@ exports.handleNLPRequest = async (req, res) => {
         if (sessionId) cache.clearSession(sessionId);
         return res.json({
           response: "query.exit",
-          speech: "주문을 종료할게요. 감사합니다!",
+          speech: "주문 여기까지 진행할게요. 감사합니다!",
           page: "exit",
         });
       }

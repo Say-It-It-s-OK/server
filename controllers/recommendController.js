@@ -121,12 +121,11 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
           { $limit: count },
         ]);
 
+        const names = results.map(item => item.name).join(", ");
         const responseSpeech = results.length === 0
-          ? "더 이상 추천해드릴 수 있는 메뉴가 없어요."
-          : results.length < count
-          ? `${results.length}개만 추천이 가능해요. 인기 메뉴를 알려드릴게요.`
-          : "인기 기준으로 추천해드릴게요.";
-
+          ? "더 이상 추천드릴 메뉴가 없어요."
+          : `${names}가 인기가 많아요.`;
+        
         if (results.length > 0) {
           cache.addRecommendations(currentSessionId, filtersPayload, results);
         }
@@ -155,12 +154,11 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
 
         const results = await Menu.aggregate(pipeline);
 
+        const names = results.map(item => item.name).join(", ");
         const responseSpeech = results.length === 0
-          ? "조건에 맞는 메뉴가 더 이상 없어요."
-          : results.length < count
-          ? `${results.length}개만 조건에 맞는 메뉴가 있어요. 추천해드릴게요.`
-          : "조건에 맞춰 추천해드릴게요.";
-
+          ? "조건에 딱 맞는 메뉴는 없는 것 같아요."
+          : `${names} 어떠세요?.`;
+        
         if (results.length > 0) {
           cache.addRecommendations(currentSessionId, filtersPayload, results);
         }

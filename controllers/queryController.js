@@ -26,7 +26,7 @@ exports.handleConfirm = async (req, res) => {
 
       return res.json({
         response: request,
-        speech: `${categories.join(", ")} 메뉴를 보여드릴게요.`,
+        speech: `${categories.join(", ")} 메뉴 보여드릴게요.`,
         page: pageValue,
         items: result,
       });
@@ -38,7 +38,7 @@ exports.handleConfirm = async (req, res) => {
 
       return res.json({
         response: request,
-        speech: "장바구니 내역입니다.",
+        speech: "지금 담으신 내역이에요.",
         page: "confirm_cart",
         sessionId,
         items: cart || [],
@@ -60,7 +60,7 @@ exports.handleConfirm = async (req, res) => {
 
       return res.json({
         response: request,
-        speech: "요청하신 메뉴의 주문 상태입니다.",
+        speech: "메뉴는 이렇게 주문 들어가 있어요.",
         page: "confirm_order",
         sessionId,
         items: filtered,
@@ -73,7 +73,7 @@ exports.handleConfirm = async (req, res) => {
 
       return res.json({
         response: request,
-        speech: `총 주문 금액은 ${totalPrice}원입니다.`,
+        speech: `가격은 총 ${totalPrice}원이에요.`,
         page: "confirm_price",
         sessionId,
         total: totalPrice,
