@@ -21,7 +21,7 @@ const buildOptionUpdateSpeech = (itemName, options) => {
       if (value === "없음" || value === "0") {
         phrases.push("샷 빼드릴게요");
       } else {
-        phrases.push(`샷 ${value}로 조절해드릴게요`);
+        phrases.push(`샷 ${value}로 해드릴게요`);
       }
     } else {
       phrases.push(`${key}을(를) ${value}로 바꿔드릴게요`);
