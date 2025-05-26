@@ -1,6 +1,36 @@
 const cache = require("../utils/BackendCache");
 const Order = require("../models/orders"); 
 
+const buildOptionUpdateSpeech = (itemName, options) => {
+  if (!options || Object.keys(options).length === 0) return `${itemName} 옵션을 변경했어요.`;
+
+  const phrases = [];
+
+  for (const [key, value] of Object.entries(options)) {
+    if (key === "온도") {
+      if (value.includes("따뜻") || value === "핫") {
+        phrases.push("따뜻한 걸로 바꿔드릴게요");
+      } else if (value.includes("아이스") || value === "차가운") {
+        phrases.push("아이스로 바꿔드릴게요");
+      } else {
+        phrases.push(`${value}로 바꿔드릴게요`);
+      }
+    } else if (key === "크기") {
+      phrases.push(`${value} 사이즈로 바꿔드릴게요`);
+    } else if (key === "샷") {
+      if (value === "없음" || value === "0") {
+        phrases.push("샷 빼드릴게요");
+      } else {
+        phrases.push(`샷 ${value}로 조절해드릴게요`);
+      }
+    } else {
+      phrases.push(`${key}을(를) ${value}로 바꿔드릴게요`);
+    }
+  }
+
+  return `${itemName}, ${phrases.join(", ")}.`;
+};
+
 // ✅ 장바구니 추가
 exports.add = (req, res) => {
   const { sessionId, item } = req.body;
@@ -52,6 +82,7 @@ exports.update = (req, res) => {
     response: "cart.update",
     sessionId,
     speech: `${cart[cartIndex].name}, 말씀하신 대로 옵션 바꿨어요.`,
+
     page: "order_update",
     item: cart[cartIndex],
   });
