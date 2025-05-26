@@ -36,16 +36,26 @@ const menuSchema = new mongoose.Schema(
       type: optionSchema,
       required: true,
     },
+    // ✅ 옵션별 가격 정보 추가
+    optionPrices: {
+      type: Map,
+      of: Map, // 예: optionPrices.크기.get("M") → 500
+      default: {},
+    },
     ingredient: {
       type: [String],
       default: [],
     },
-    caffeine : {
+    caffeine: {
       type: String
     },
-    tag : {
+    tag: {
       type: [String]
-    }
+    },
+    image: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );
