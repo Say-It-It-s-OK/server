@@ -112,6 +112,7 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
               name: { $first: "$menu.name" },
               type: { $first: "$menu.type" },
               price: { $first: "$menu.price" },
+              image: { $first: "$menu.image" },    
               options: { $first: "$menu.options" },
               ingredient: { $first: "$menu.ingredient" },
               totalOrders: { $sum: "$quantity" },
