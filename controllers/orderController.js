@@ -248,6 +248,16 @@ exports.handleOrder = async (req, res) => {
     const items = payload.items || [];
     const results = [];
 
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.json({
+        response: request,
+        sessionId,
+        speech: "메뉴를 추가하였습니다.",
+        page: "add_menu"
+      });
+    }
+
+
     for (const item of items) {
       const menu = await Menu.findOne({ name: item.name });
       if (!menu) {
@@ -434,13 +444,20 @@ exports.handleOrder = async (req, res) => {
             });
           }
         }
-
+        if (item.options && Object.keys(item.options).length > 0) {
+          return res.json({
+            response: request,
+            sessionId,
+            speech: `옵션을 선택하였습니다.`,
+            page: "option_resolved",
+            selectedOptions: item.options
+          });
+        }
         return res.json({
           response: request,
           sessionId,
-          speech: `옵션 선택되었습니다.`,
-          page: "option_resolved",
-          selectedOptions: item.options
+          speech: "옵션을 변경하였습니다.",
+          page: "update_options"
         });
       }
 
@@ -482,7 +499,12 @@ exports.handleOrder = async (req, res) => {
       const items = payload.items || [];
 
       if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: "삭제할 항목이 없습니다." });
+        return res.json({
+          response: request,
+          sessionId,
+          speech: "메뉴를 삭제하였습니다.",
+          page: "delete_menu"
+        });
       }
 
       const cart = cache.getCart(sessionId);
