@@ -121,6 +121,7 @@ const finalizeItem = async (rawItem) => {
     caffeine: menu.caffeine,
     price: finalPrice,
     _id: menu._id,
+    image: menu.image,
   };
 };
 
