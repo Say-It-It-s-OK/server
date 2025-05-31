@@ -80,10 +80,18 @@ exports.handleConfirm = async (req, res) => {
       });
 
     } else {
-      return res.status(400).json({ error: "지원하지 않는 target입니다." });
+        return res.json({
+          response: "query.error",
+          speech: "그 부분은 도와드릴 수 없어요. 다시 말씀해주세요.",
+          page: "error"
+        });
     }
   } catch (err) {
     console.error("confirm 처리 오류:", err);
-    return res.status(500).json({ error: "확인 처리 중 오류가 발생했습니다." });
+    return res.json({
+      response: "query.error",
+      speech: "그 부분은 도와드릴 수 없어요. 다시 말씀해주세요.",
+      page: "error"
+    });
   }
 };

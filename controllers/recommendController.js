@@ -25,7 +25,11 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
     if (action === "retry") {
       filtersPayload = cache.getLastFilters(currentSessionId);
       if (!filtersPayload) {
-        return res.status(400).json({ error: "재추천을 위한 조건이 없습니다." });
+        return res.json({
+          response: "query.error",
+          speech: "어떤 기준으로 추천해드릴까요?",
+          page: "error"
+        });
       }
     }
 
@@ -158,7 +162,7 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
         const names = results.map(item => item.name).join(", ");
         const responseSpeech = results.length === 0
           ? "조건에 딱 맞는 메뉴는 없는 것 같아요."
-          : `${names} 어떠세요?.`;
+          : `${names} 어떠세요?`;
         
         if (results.length > 0) {
           cache.addRecommendations(currentSessionId, filtersPayload, results);
@@ -174,9 +178,17 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
       }
     } catch (err) {
       console.error("추천 오류:", err);
-      return res.status(500).json({ error: "추천 처리 중 오류가 발생했습니다." });
+      return res.json({
+        response: "query.error",
+        speech: "어떤 기준으로 추천해드릴까요?",
+        page: "error"
+      });
     }
   }
 
-  return res.status(400).json({ error: "지원하지 않는 request입니다." });
+  return res.json({
+    response: "query.error",
+    speech: "죄송해요, 해당 요청은 처리할 수 없어요. 다시 한번 말씀해주시겠어요?",
+    page: "error"
+  });
 };

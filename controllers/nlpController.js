@@ -143,7 +143,11 @@ exports.handleNLPRequest = async (req, res) => {
           });
         }
 
-        return res.status(400).json({ error: "알 수 없는 reply action입니다." });
+        return res.json({
+          response: "query.error",
+          speech: "그것은 확인해드릴 수 없어요. 다시 한 번 말씀해주세요.",
+          page: "error"
+        });
       }
 
       if (action === "exit") {
@@ -160,9 +164,17 @@ exports.handleNLPRequest = async (req, res) => {
       }
     }
 
-    return res.status(400).json({ error: "알 수 없는 요청입니다." });
+    return res.json({
+      response: "query.error",
+      speech: "올바르지 않은 형식입니다. 다시 말씀해주세요.",
+      page: "error"
+    });
   } catch (err) {
     console.error("NLP 처리 중 오류:", err);
-    return res.status(500).json({ error: "서버 내부 오류" });
+    return res.json({
+      response: "query.error",
+      speech: "죄송합니다. NLP 서버에서 문제가 발생하였습니다.",
+      page: "error"
+    });
   }
 };
