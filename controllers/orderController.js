@@ -560,6 +560,23 @@ exports.handleOrder = async (req, res) => {
       }
     }
 
+    
+    // ✅ 총액 계산: price × quantity 반영
+    const total = [...itemMap.values()].reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
+    if (total === 0) {
+      return res.json({
+        response: "query.error",
+        sessionId,
+        speech: "결제할 항목이 없어요.",
+        page: "error"
+      });
+    }
+
+
     for (const [, item] of itemMap) {
       // 👉 콘솔에 저장될 데이터 출력
       console.log("[DB 저장 예정]", {
@@ -577,11 +594,6 @@ exports.handleOrder = async (req, res) => {
       });
     }
 
-    // ✅ 총액 계산: price × quantity 반영
-    const total = [...itemMap.values()].reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
     cache.clearSession(sessionId);
 
     return res.json({
