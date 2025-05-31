@@ -141,6 +141,8 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
           page: "recommend_custom",
           currentSessionId,
           items: results,
+          title: "추천 메뉴",
+
         });
       } else {
         const pipeline = [];
@@ -174,6 +176,7 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
           page: "recommend_custom",
           sessionId: currentSessionId,
           items: results,
+          title: "추천 메뉴",
         });
       }
     } catch (err) {
