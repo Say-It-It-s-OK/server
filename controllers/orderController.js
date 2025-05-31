@@ -177,9 +177,6 @@ const handleNextItem = async (sessionId, request, res) => {
     required.push("온도", "크기");
   } else if (menu.type === "음료") {
     if (Array.isArray(options["온도"]) && options["온도"].length === 1) {
-      if (!item.options["온도"]) {
-        item.options["온도"] = options["온도"][0];
-      }
       required.push("크기");
     } else {
       required.push("온도", "크기");
@@ -262,9 +259,10 @@ exports.handleOrder = async (req, res) => {
       const menu = await Menu.findOne({ name: item.name });
       if (!menu) {
         results.push({
-          response: request,
-          speech: `${item.name}은(는) 존재하지 않는 메뉴입니다.`,
-          page: "order_error"
+          response: "query.error",
+          sessionId,
+          speech: `죄송해요, ${item.name}은(는) 아직 준비되지 않은 메뉴예요. 다른 메뉴로 도와드릴까요?`,
+          page: "error"
         });
         continue;
       }
@@ -285,312 +283,320 @@ exports.handleOrder = async (req, res) => {
           required.push("크기");
         } else {
           required.push("온도", "크기");
-
-  
         }
       }
 
-        const missing = required.filter((key) => !item.options?.[key]);
+      const missing = required.filter((key) => !item.options?.[key]);
 
-        if (missing.length > 0) {
-          const pendingId = uuidv4();
-          cache.setPendingOrder(sessionId, {
-            currentAction: "order.add",
-            pendingItem: item,
-            needOptions: missing,
-            allOptions: options,
-            id: pendingId
-          });
+      if (missing.length > 0) {
+        const pendingId = uuidv4();
+        cache.setPendingOrder(sessionId, {
+          currentAction: "order.add",
+          pendingItem: item,
+          needOptions: missing,
+          allOptions: options,
+          id: pendingId
+        });
 
-          results.push({
-            response: request,
-            page: "order_option_required",
-            speech: buildOptionSpeech(item.name, missing, options),
-            item: await finalizeItem(item),
-            needOptions: missing,
-            options,
-            pendingid: pendingId
-          });
-        } else {
-          const finalizedItem = await finalizeItem(item);
-          cache.addToCart(sessionId, finalizedItem);
-          results.push({
-            response: request,
-            page: "order_add",
-            speech: `${item.name}, 추가했어요.`,
-            items: [finalizedItem]
-          });
-        }
+        results.push({
+          response: request,
+          page: "order_option_required",
+          speech: buildOptionSpeech(item.name, missing, options),
+          item: await finalizeItem(item),
+          needOptions: missing,
+          options,
+          pendingid: pendingId
+        });
+      } else {
+        const finalizedItem = await finalizeItem(item);
+        cache.addToCart(sessionId, finalizedItem);
+        results.push({
+          response: request,
+          page: "order_add",
+          speech: `${item.name}, 추가했어요.`,
+          items: [finalizedItem]
+        });
       }
-
-      return res.json({
-        response: "query.sequence",
-        sessionId,
-        results
-      });
     }
+
+    return res.json({
+      response: "query.sequence",
+      sessionId,
+      results
+    });
+  }
     
-    if (actionType === "update") {
-      const itemList = payload.items || [];
-      const item = itemList[0] || {};
-      const pendingId = payload.id;
-      const session = await sessionHelper.getSession(sessionId);
+  if (actionType === "update") {
+    const itemList = payload.items || [];
+    const item = itemList[0] || {};
+    const pendingId = payload.id;
+    const session = await sessionHelper.getSession(sessionId);
 
-      const pendingOrders = cache.getPendingOrder(sessionId);
-      const cart = cache.getCart(sessionId);
+    const pendingOrders = cache.getPendingOrder(sessionId);
+    const cart = cache.getCart(sessionId);
 
-      // 옵션을 한글 key로 매핑
-      itemList.forEach(item => {
-        if (item.options) mapKeys(item.options);
-        if (item.from?.options) mapKeys(item.from.options);
-        if (item.to?.options) mapKeys(item.to.options);
+    // 옵션을 한글 key로 매핑
+    itemList.forEach(item => {
+      if (item.options) mapKeys(item.options);
+      if (item.from?.options) mapKeys(item.from.options);
+      if (item.to?.options) mapKeys(item.to.options);
+    });
+
+    // ① from → to 구조 처리 (옵션 교체)
+    if (item.from && item.to) {
+      const index = cart.findIndex(cartItem => {
+        if (cartItem.name !== item.from.name) return false;
+        const selOpts = cartItem.selectedOptions || {};
+        const fromOpts = item.from.options || {};
+        return Object.entries(fromOpts).every(
+          ([key, value]) => selOpts[key] === value
+        );
       });
 
-      // ① from → to 구조 처리 (옵션 교체)
-      if (item.from && item.to) {
-        const index = cart.findIndex(cartItem => {
-          if (cartItem.name !== item.from.name) return false;
-          const selOpts = cartItem.selectedOptions || {};
-          const fromOpts = item.from.options || {};
-          return Object.entries(fromOpts).every(
-            ([key, value]) => selOpts[key] === value
-          );
-        });
+      if (index !== -1) {
+        cart[index].selectedOptions = {
+          ...(cart[index].selectedOptions || {}),
+          ...(item.to.options || {})
+        };
 
-        if (index !== -1) {
-          cart[index].selectedOptions = {
-            ...(cart[index].selectedOptions || {}),
-            ...(item.to.options || {})
-          };
-
-          cache.setCart(sessionId, cart);
-
-          return res.json({
-            response: request,
-            sessionId,
-            speech: buildOptionUpdateSpeech(item.to.options),
-            page: "order_update"
-          });
-        }
-
-        return res.status(400).json({
-          response: request,
-          sessionId,
-          error: "변경할 항목을 찾을 수 없습니다.",
-          page: "order_update_error"
-        });
-      }
-
-      // 1️⃣ pending 처리 (옵션만 보완한 경우)
-      if (!item.name) {
-        if (pendingOrders.length > 0) {
-          let pending = pendingOrders.find((p) => p.id === pendingId) || pendingOrders[pendingOrders.length - 1];
-
-          const updatedItem = {
-            ...pending.pendingItem,
-            selectedOptions: {
-              ...(pending.pendingItem.selectedOptions || {}),
-              ...(item.options || {})
-            }
-          };
-
-          const stillMissing = pending.needOptions.filter(
-            (opt) =>
-              !updatedItem.selectedOptions ||
-              updatedItem.selectedOptions[opt] === undefined ||
-              updatedItem.selectedOptions[opt] === null
-          );
-
-          if (stillMissing.length === 0) {
-            const finalizedItem = await finalizeItem(updatedItem);
-            cache.addToCart(sessionId, finalizedItem);
-            cache.removePendingOrder(sessionId, pending.id);
-            cache.clearPendingOrder(sessionId);
-            session.itemQueue = session.itemQueue || [];
-            session.itemQueue.shift();
-            await sessionHelper.saveSession(sessionId, session);
-
-            // ✅ 다음 항목으로 자동 이동 ❌ → 여기서 한 항목만 응답
-            return res.json({
-              response: "query.sequence",
-              sessionId,
-              results: [
-                {
-                  response: "query.order.add",
-                  page: "options_order_add",
-                  speech: `${finalizedItem.name}, 추가했어요.`,
-                  items: [finalizedItem]
-                }
-              ]
-            });
-          } else {
-            cache.updatePendingOrder(sessionId, pending.id, {
-              ...pending,
-              pendingItem: updatedItem,
-              needOptions: stillMissing,
-            });
-
-            const finalizedInfo = await finalizeItem(updatedItem);
-
-            return res.json({
-              response: "query.order.add",
-              sessionId,
-              speech: buildOptionSpeech(updatedItem.name, stillMissing, pending.allOptions),
-              page: "order_option_required",
-              item: finalizedInfo,
-              needOptions: stillMissing,
-              options: pending.allOptions,
-              pendingid: pending.id,
-            });
-          }
-        }
-        if (item.options && Object.keys(item.options).length > 0) {
-          return res.json({
-            response: request,
-            sessionId,
-            speech: `옵션을 선택하였습니다.`,
-            page: "option_resolved",
-            selectedOptions: item.options
-          });
-        }
-        return res.json({
-          response: request,
-          sessionId,
-          speech: "옵션을 변경하였습니다.",
-          page: "update_options"
-        });
-      }
-
-      // 2️⃣ 장바구니 직접 수정 (이름+옵션 명시한 경우)
-      let isCartUpdated = false;
-
-      for (const targetItem of itemList) {
-        const cartItem = cart.find(c => {
-          if (c.name !== targetItem.name) return false;
-          return Object.entries(targetItem.options || {}).every(
-            ([key, value]) => c.selectedOptions[key] !== undefined
-          ) || Object.keys(targetItem.options || {}).length === 0;
-        });
-
-        if (cartItem) {
-          cartItem.selectedOptions = {
-            ...(cartItem.selectedOptions || {}),
-            ...(targetItem.options || {})
-          };
-          isCartUpdated = true;
-        }
-      }
-
-      if (isCartUpdated) {
         cache.setCart(sessionId, cart);
+
         return res.json({
           response: request,
           sessionId,
-          speech: buildOptionUpdateSpeech(itemList[0].options),
+          speech: buildOptionUpdateSpeech(item.to.options),
           page: "order_update"
         });
       }
 
-      return res.status(400).json({ error: "변경할 메뉴를 찾을 수 없습니다." });
-    }
-
-
-    if (actionType === "delete") {
-      const items = payload.items || [];
-
-      if (!Array.isArray(items) || items.length === 0) {
-        return res.json({
-          response: request,
-          sessionId,
-          speech: "메뉴를 삭제하였습니다.",
-          page: "delete_menu"
-        });
-      }
-
-      const cart = cache.getCart(sessionId);
-      const updatedCart = [...cart]; // 복사본
-
-      for (const target of items) {
-        mapKeys(target.options); // keyMap 적용
-
-        // 항목 하나씩 찾아서 삭제
-        const index = updatedCart.findIndex(cartItem => {
-          if (cartItem.name !== target.name) return false;
-
-          const selOpts = cartItem.selectedOptions || {};
-          const tgtOpts = target.options || {};
-
-          // 옵션이 있는 경우 정확히 일치해야 삭제
-          return Object.keys(tgtOpts).every(
-            key => selOpts[key] === tgtOpts[key]
-          );
-        });
-
-        // 일치하는 항목 삭제
-        if (index !== -1) {
-          updatedCart.splice(index, 1);
-        }
-      }
-
-      cache.setCart(sessionId, updatedCart);
-
       return res.json({
-        response: request,
-        speech: `${items.length}개 메뉴 빼드렸어요.`,
+        response: "query.error",
         sessionId,
-        page: "order_delete"
+        speech: "장바구니에서 변경할 메뉴를 찾지 못했어요. 다시 한 번 확인해주시겠어요?",
+        page: "error"
       });
     }
 
-    if (actionType === "pay") {
-      const cart = cache.getCart(sessionId);
-      const now = new Date();
-      const orderId = "ORD" + now.toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
+    // 1️⃣ pending 처리 (옵션만 보완한 경우)
+    if (!item.name) {
+      if (pendingOrders.length > 0) {
+        let pending = pendingOrders.find((p) => p.id === pendingId) || pendingOrders[pendingOrders.length - 1];
 
-      // ✅ 메뉴별로 그룹핑 후 수량 계산
-      const itemMap = new Map();
+        const updatedItem = {
+          ...pending.pendingItem,
+          selectedOptions: {
+            ...(pending.pendingItem.selectedOptions || {}),
+            ...(item.options || {})
+          }
+        };
 
-      for (const item of cart) {
-        const key = item.id;
-        if (!itemMap.has(key)) {
-          itemMap.set(key, { ...item, quantity: 1 });
+        const stillMissing = pending.needOptions.filter(
+          (opt) =>
+            !updatedItem.selectedOptions ||
+            updatedItem.selectedOptions[opt] === undefined ||
+            updatedItem.selectedOptions[opt] === null
+        );
+
+        if (stillMissing.length === 0) {
+          const finalizedItem = await finalizeItem(updatedItem);
+          cache.addToCart(sessionId, finalizedItem);
+          cache.removePendingOrder(sessionId, pending.id);
+          cache.clearPendingOrder(sessionId);
+          session.itemQueue = session.itemQueue || [];
+          session.itemQueue.shift();
+          await sessionHelper.saveSession(sessionId, session);
+
+          // ✅ 다음 항목으로 자동 이동 ❌ → 여기서 한 항목만 응답
+          return res.json({
+            response: "query.sequence",
+            sessionId,
+            results: [
+              {
+                response: "query.order.add",
+                page: "options_order_add",
+                speech: `${finalizedItem.name}, 추가했어요.`,
+                items: [finalizedItem]
+              }
+            ]
+          });
         } else {
-          itemMap.get(key).quantity += 1;
+          cache.updatePendingOrder(sessionId, pending.id, {
+            ...pending,
+            pendingItem: updatedItem,
+            needOptions: stillMissing,
+          });
+
+          const finalizedInfo = await finalizeItem(updatedItem);
+
+          return res.json({
+            response: "query.order.add",
+            sessionId,
+            speech: buildOptionSpeech(updatedItem.name, stillMissing, pending.allOptions),
+            page: "order_option_required",
+            item: finalizedInfo,
+            needOptions: stillMissing,
+            options: pending.allOptions,
+            pendingid: pending.id,
+          });
         }
       }
+      if (item.options && Object.keys(item.options).length > 0) {
+        return res.json({
+          response: request,
+          sessionId,
+          speech: `옵션을 선택하였습니다.`,
+          page: "option_resolved",
+          selectedOptions: item.options
+        });
+      }
+      return res.json({
+        response: request,
+        sessionId,
+        speech: "옵션을 변경하였습니다.",
+        page: "update_options"
+      });
+    }
 
-      for (const [, item] of itemMap) {
-        // 👉 콘솔에 저장될 데이터 출력
-        console.log("[DB 저장 예정]", {
+    // 2️⃣ 장바구니 직접 수정 (이름+옵션 명시한 경우)
+    let isCartUpdated = false;
+
+    for (const targetItem of itemList) {
+      const cartItem = cart.find(c => {
+        if (c.name !== targetItem.name) return false;
+        return Object.entries(targetItem.options || {}).every(
+          ([key, value]) => c.selectedOptions[key] !== undefined
+        ) || Object.keys(targetItem.options || {}).length === 0;
+      });
+
+      if (cartItem) {
+        cartItem.selectedOptions = {
+          ...(cartItem.selectedOptions || {}),
+          ...(targetItem.options || {})
+        };
+        isCartUpdated = true;
+      }
+    }
+
+    if (isCartUpdated) {
+      cache.setCart(sessionId, cart);
+      return res.json({
+        response: request,
+        sessionId,
+        speech: buildOptionUpdateSpeech(itemList[0].options),
+        page: "order_update"
+      });
+    }
+
+    return res.json({
+      response: "query.error",
+      sessionId,
+      speech: "장바구니에서 변경할 메뉴를 찾지 못했어요. 다시 한 번 확인해주시겠어요?",
+      page: "error"
+    });
+  }
+
+
+  if (actionType === "delete") {
+    const items = payload.items || [];
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.json({
+        response: request,
+        sessionId,
+        speech: "메뉴를 삭제하였습니다.",
+        page: "delete_menu"
+      });
+    }
+
+    const cart = cache.getCart(sessionId);
+    const updatedCart = [...cart]; // 복사본
+
+    for (const target of items) {
+      mapKeys(target.options); // keyMap 적용
+
+      // 항목 하나씩 찾아서 삭제
+      const index = updatedCart.findIndex(cartItem => {
+        if (cartItem.name !== target.name) return false;
+
+        const selOpts = cartItem.selectedOptions || {};
+        const tgtOpts = target.options || {};
+
+        // 옵션이 있는 경우 정확히 일치해야 삭제
+        return Object.keys(tgtOpts).every(
+          key => selOpts[key] === tgtOpts[key]
+        );
+      });
+
+      // 일치하는 항목 삭제
+      if (index !== -1) {
+        updatedCart.splice(index, 1);
+      }
+    }
+
+    cache.setCart(sessionId, updatedCart);
+
+    return res.json({
+      response: request,
+      speech: `${items.length}개 메뉴 빼드렸어요.`,
+      sessionId,
+      page: "order_delete"
+    });
+  }
+
+  if (actionType === "pay") {
+    const cart = cache.getCart(sessionId);
+    const now = new Date();
+    const orderId = "ORD" + now.toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
+
+    // ✅ 메뉴별로 그룹핑 후 수량 계산
+    const itemMap = new Map();
+
+    for (const item of cart) {
+      const key = item.id;
+      if (!itemMap.has(key)) {
+        itemMap.set(key, { ...item, quantity: 1 });
+      } else {
+        itemMap.get(key).quantity += 1;
+      }
+    }
+
+    for (const [, item] of itemMap) {
+      // 👉 콘솔에 저장될 데이터 출력
+      console.log("[DB 저장 예정]", {
+      order_id: orderId,
+      order_date: now,
+      menu_id: item.id,
+      quantity: item.quantity
+      });
+
+      await Order.create({
         order_id: orderId,
         order_date: now,
         menu_id: item.id,
         quantity: item.quantity
-        });
-
-        await Order.create({
-          order_id: orderId,
-          order_date: now,
-          menu_id: item.id,
-          quantity: item.quantity
-        });
-      }
-
-      // ✅ 총액 계산: price × quantity 반영
-      const total = [...itemMap.values()].reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
-      cache.clearSession(sessionId);
-
-      return res.json({
-        response: request,
-        speech: `총 ${total}원입니다. 감사합니다!`,
-        sessionId,
-        page: "order_pay",
-        total
       });
     }
 
-    return res.status(400).json({ error: "지원하지 않는 order 타입입니다." });
-  };
+    // ✅ 총액 계산: price × quantity 반영
+    const total = [...itemMap.values()].reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    cache.clearSession(sessionId);
+
+    return res.json({
+      response: request,
+      speech: `총 ${total}원입니다. 감사합니다!`,
+      sessionId,
+      page: "order_pay",
+      total
+    });
+  }
+
+  return res.json({
+    response: "query.error",
+    sessionId,
+    speech: "죄송해요, 아직 지원하지 않는 주문 유형이에요. 다시 한 번 말씀해주시겠어요?",
+    page: "error"
+  });
+};
