@@ -85,6 +85,48 @@ exports.handleRecommend = async (req, res, payloadArg = null, actionArg = null) 
     try {
       const match = buildMatchStage();
 
+      if (filters.group_counts) {
+        const groupCounts = filters.group_counts;
+        const groupResults = [];
+
+        for (const [key, count] of Object.entries(groupCounts)) {
+          const matchStage = [];
+
+          if (["커피", "음료", "디카페인", "디저트"].includes(key)) {
+            // ✅ 카테고리 기반
+            matchStage.push({ type: key });
+          } else if (key.startsWith("tag:")) {
+            const [, category, tag] = key.split(":");
+            matchStage.push({ type: category, tag: tag });
+          } else {
+            // ✅ 태그 기반
+            matchStage.push({ tag: key });
+          }
+
+          const matched = await Menu.aggregate([
+            { $match: { $and: matchStage } },
+            { $sample: { size: count } }
+          ]);
+
+          groupResults.push(...matched);
+        }
+
+        if (groupResults.length > 0) {
+          cache.addRecommendations(currentSessionId, filtersPayload, groupResults);
+        }
+
+        const names = groupResults.map(i => i.name).join(", ");
+        const responseSpeech = names.length === 0 ? "추천드릴 메뉴가 없어요." : `${names} 어떠세요?`;
+
+        return res.json({
+          response: "query.recommend",
+          speech: responseSpeech,
+          page: "recommend_custom",
+          sessionId: currentSessionId,
+          items: groupResults,
+        });
+      }
+
       if (includePopular) {
         const menuMatch = match.$and
           ? {
