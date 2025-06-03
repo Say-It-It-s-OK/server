@@ -5,9 +5,11 @@ const cache = require("../utils/BackendCache");
 const sessionHelper = require("../utils/sessionHelper");
 
 exports.handleNLPRequest = async (req, res) => {
-  const { request, payload } = req.body;
+  const { request, payload, page } = req.body;
   const sessionId = sessionHelper.ensureSession(req);
   console.log("[NLP 요청 수신]", request, payload);
+  console.log("[DEBUG] NLP → page 전달 확인:", page);
+
 
   try {
     if (request === "query.sequence") {
@@ -17,8 +19,11 @@ exports.handleNLPRequest = async (req, res) => {
         items = [],
         categories = [],
         target,
-        action
+        action,
+        page,
       } = payload;
+
+      console.log("[DEBUG] NLP → page 전달 확인:", page);
 
       const results = [];
 
@@ -40,7 +45,7 @@ exports.handleNLPRequest = async (req, res) => {
 
         req.body = {
           request: `query.${intent}`,
-          payload: { filters, items, categories, target, action },
+          payload: { filters, items, categories, target, action, page },
           sessionId
         };
 
