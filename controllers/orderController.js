@@ -404,7 +404,6 @@ exports.handleOrder = async (req, res) => {
     if (!item.name) {
       if (pendingOrders.length > 0) {
         let pending = pendingOrders.find((p) => p.id === pendingId) || pendingOrders[0];
-        console.log("이것좀 보세요", pending)
 
         const updatedItem = {
           ...pending.pendingItem,
@@ -425,11 +424,29 @@ exports.handleOrder = async (req, res) => {
           const finalizedItem = await finalizeItem(updatedItem);
           cache.addToCart(sessionId, finalizedItem);
           cache.removePendingOrder(sessionId, pending.id);
-          cache.clearPendingOrder(sessionId);
           session.itemQueue = session.itemQueue || [];
           session.itemQueue.shift();
           await sessionHelper.saveSession(sessionId, session);
 
+          // ✅ 다음 pending 항목 있는지 확인
+          const nextPending = cache.getPendingOrder(sessionId)[0];
+
+          if (nextPending) {
+            return res.json({
+              response: "query.order.add",
+              sessionId,
+              speech: buildOptionSpeech(
+                nextPending.pendingItem.name,
+                nextPending.needOptions,
+                nextPending.allOptions
+              ),
+              page: "order_option_required",
+              item: await finalizeItem(nextPending.pendingItem),
+              needOptions: nextPending.needOptions,
+              options: nextPending.allOptions,
+              pendingid: nextPending.id
+            });
+          }
           // ✅ 다음 항목으로 자동 이동 ❌ → 여기서 한 항목만 응답
           return res.json({
             response: "query.sequence",
@@ -437,7 +454,7 @@ exports.handleOrder = async (req, res) => {
             results: [
               {
                 response: "query.order.add",
-                page: "order_option_resolved",
+                page: "options_order_add",
                 speech: `${finalizedItem.name} 추가했어요.`,
                 items: [finalizedItem]
               }
