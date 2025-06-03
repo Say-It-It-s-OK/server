@@ -186,7 +186,7 @@ const handleNextItem = async (sessionId, request, res) => {
   const missing = required.filter((key) => !item.options[key]);
   if (missing.length > 0) {
     const pendingId = uuidv4();
-    cache.setPendingOrder(sessionId, {
+    cache.addPendingOrder(sessionId, {
       currentAction: "order.add",
       pendingItem: item,
       needOptions: missing,
@@ -239,6 +239,7 @@ const handleNextItem = async (sessionId, request, res) => {
 exports.handleOrder = async (req, res) => {
   const sessionId = sessionHelper.ensureSession(req);
   const { request, payload } = req.body;
+  const { page } = payload;
   const actionType = request.split(".")[2];
 
   if (actionType === "add") {
@@ -288,9 +289,16 @@ exports.handleOrder = async (req, res) => {
 
       const missing = required.filter((key) => !item.options?.[key]);
 
+      // ✅ 여기부터 로그 찍기
+      console.log("[추적] 메뉴:", item.name);
+      console.log(" - 입력 옵션:", item.options);
+      console.log(" - 필수 옵션:", required);
+      console.log(" - 누락된 옵션:", missing);
+
       if (missing.length > 0) {
+        console.log(" ✅ pending 등록됨:", item.name);
         const pendingId = uuidv4();
-        cache.setPendingOrder(sessionId, {
+        cache.addPendingOrder(sessionId, {
           currentAction: "order.add",
           pendingItem: item,
           needOptions: missing,
@@ -313,7 +321,7 @@ exports.handleOrder = async (req, res) => {
         results.push({
           response: request,
           page: "order_add",
-          speech: `${item.name}, 추가했어요.`,
+          speech: `${item.name} 추가했어요.`,
           items: [finalizedItem]
         });
       }
@@ -380,7 +388,8 @@ exports.handleOrder = async (req, res) => {
     // 1️⃣ pending 처리 (옵션만 보완한 경우)
     if (!item.name) {
       if (pendingOrders.length > 0) {
-        let pending = pendingOrders.find((p) => p.id === pendingId) || pendingOrders[pendingOrders.length - 1];
+        let pending = pendingOrders.find((p) => p.id === pendingId) || pendingOrders[0];
+        console.log("이것좀 보세요", pending)
 
         const updatedItem = {
           ...pending.pendingItem,
@@ -440,6 +449,31 @@ exports.handleOrder = async (req, res) => {
           });
         }
       }
+      // ✅ 🌟 장바구니 1개만 있을 경우 → 자동 업데이트
+      if (page === "장바구니" && item.options && Object.keys(item.options).length > 0) {
+        if (cart.length === 1) {
+          const targetItem = cart[0];
+          targetItem.selectedOptions = {
+            ...(targetItem.selectedOptions || {}),
+            ...item.options
+          };
+          cache.setCart(sessionId, cart);
+          return res.json({
+            response: request,
+            sessionId,
+            speech: buildOptionUpdateSpeech(item.options),
+            page: "order_update"
+          });
+        } else {
+          return res.json({
+            response: request,
+            sessionId,
+            speech: "장바구니에 여러 개가 있어서 어떤 걸 바꿀지 몰라요. 메뉴 이름도 말씀해 주세요.",
+            page: "error"
+          });
+        }
+      }
+
       if (item.options && Object.keys(item.options).length > 0) {
         return res.json({
           response: request,
@@ -504,7 +538,7 @@ exports.handleOrder = async (req, res) => {
         response: request,
         sessionId,
         speech: "메뉴를 삭제하였습니다.",
-        page: "delete_menu"
+        page: "order_delete"
       });
     }
 

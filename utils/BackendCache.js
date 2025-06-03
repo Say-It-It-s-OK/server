@@ -29,7 +29,7 @@ function ensureSession(req) {
 function setPendingOrder(sessionId, pendingData) {
   initSession(sessionId);
   sessions[sessionId].pendingOrder = pendingData;
-  sessions[sessionId].pendingOrders = [pendingData]; // 하나만 유지
+  //sessions[sessionId].pendingOrders = [pendingData]; // 하나만 유지
 }
 
 function getPendingOrderSingle(sessionId) {
