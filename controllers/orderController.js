@@ -437,8 +437,8 @@ exports.handleOrder = async (req, res) => {
             results: [
               {
                 response: "query.order.add",
-                page: "options_order_add",
-                speech: `${finalizedItem.name}, 추가했어요.`,
+                page: "order_option_resolved",
+                speech: `${finalizedItem.name} 추가했어요.`,
                 items: [finalizedItem]
               }
             ]
@@ -559,6 +559,9 @@ exports.handleOrder = async (req, res) => {
 
     const cart = cache.getCart(sessionId);
     const updatedCart = [...cart]; // 복사본
+    let deletedCount = 0;
+    let notFoundNames = [];
+
 
     for (const target of items) {
       mapKeys(target.options); // keyMap 적용
@@ -579,10 +582,24 @@ exports.handleOrder = async (req, res) => {
       // 일치하는 항목 삭제
       if (index !== -1) {
         updatedCart.splice(index, 1);
+        deletedCount++;
+      }
+      else{
+        notFoundNames.push(target.name);
       }
     }
 
     cache.setCart(sessionId, updatedCart);
+    // ❗ 삭제된 항목 없음 + 이름도 안 맞음 → 에러 처리
+    if (deletedCount === 0 && notFoundNames.length > 0) {
+      return res.json({
+        response: "query.error",
+        sessionId,
+        speech: `${notFoundNames.join(", ")}(은)는 장바구니에 없어요.`,
+        page: "error"
+      });
+    }
+
 
     return res.json({
       response: request,
