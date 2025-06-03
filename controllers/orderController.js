@@ -93,6 +93,21 @@ const finalizeItem = async (rawItem) => {
     selectedOptions["샷"] = "보통";
   }
 
+  // ✅ 디폴트 샷 추가 설정 (음료)
+  if (menu.type === "음료" && !selectedOptions["샷 추가"] && options["샷 추가"]?.includes("없음")) {
+    selectedOptions["샷 추가"] = "없음";
+  }
+
+  // ✅ 온도 필드 제거 (온도 선택이 필요 없는 음료는 제거)
+  if (menu.type === "음료") {
+    const 온도옵션 = options["온도"];
+    if (Array.isArray(온도옵션) && 온도옵션.length === 1) {
+      delete selectedOptions["온도"];
+    }
+  }
+
+
+
   // ✅ 옵션 가격 계산
   let finalPrice = menu.price;
 
@@ -119,7 +134,7 @@ const finalizeItem = async (rawItem) => {
     tag: menu.tag,
     id: menu.id,
     caffeine: menu.caffeine,
-    price: finalPrice,
+    price: menu.price,
     _id: menu._id,
     image: menu.image,
   };
@@ -441,7 +456,7 @@ exports.handleOrder = async (req, res) => {
             response: "query.order.add",
             sessionId,
             speech: buildOptionSpeech(updatedItem.name, stillMissing, pending.allOptions),
-            page: "order_option_required",
+            page: "order_option_resolved",
             item: finalizedInfo,
             needOptions: stillMissing,
             options: pending.allOptions,
@@ -533,12 +548,12 @@ exports.handleOrder = async (req, res) => {
   if (actionType === "delete") {
     const items = payload.items || [];
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (page === "장바구니 옵션" && (!Array.isArray(items) || items.length === 0)) {
       return res.json({
         response: request,
         sessionId,
         speech: "메뉴를 삭제하였습니다.",
-        page: "order_delete"
+        page: "option_delete"
       });
     }
 
@@ -573,7 +588,7 @@ exports.handleOrder = async (req, res) => {
       response: request,
       speech: `${items.length}개 메뉴 빼드렸어요.`,
       sessionId,
-      page: "order_delete"
+      page: "cart_delete"
     });
   }
 
